@@ -1,0 +1,13 @@
+project_id = "artpowrkwqldwhbeqfiz"
+
+[functions.get-maptiler-key]
+verify_jwt = false
+
+[functions.locations]
+verify_jwt = false
+
+[functions.live-locations]
+verify_jwt = false
+
+[functions.auth]
+verify_jwt = false

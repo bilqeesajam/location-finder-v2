@@ -1,0 +1,251 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MapExplorer - Dark Cartographic Design System */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@layer base {
+  :root {
+    /* Dark slate base */
+    --background: 222 47% 6%;
+    --foreground: 210 20% 95%;
+
+    --card: 222 40% 10%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 222 45% 8%;
+    --popover-foreground: 210 20% 95%;
+
+    /* Vibrant teal accent */
+    --primary: 174 72% 50%;
+    --primary-foreground: 222 47% 6%;
+
+    --secondary: 222 30% 18%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 222 30% 15%;
+    --muted-foreground: 215 15% 55%;
+
+    --accent: 174 60% 35%;
+    --accent-foreground: 210 20% 95%;
+
+    --destructive: 0 72% 55%;
+    --destructive-foreground: 210 20% 95%;
+
+    /* Success green for approved */
+    --success: 152 69% 45%;
+    --success-foreground: 210 20% 95%;
+
+    /* Warning amber for pending */
+    --warning: 38 92% 50%;
+    --warning-foreground: 222 47% 6%;
+
+    --border: 222 25% 18%;
+    --input: 222 30% 15%;
+    --ring: 174 72% 50%;
+
+    --radius: 0.75rem;
+
+    /* Glass effect */
+    --glass-bg: 222 45% 8% / 0.85;
+    --glass-border: 210 20% 95% / 0.1;
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+
+    /* Gradient accents */
+    --gradient-primary: linear-gradient(135deg, hsl(174 72% 50%), hsl(199 89% 48%));
+    --gradient-dark: linear-gradient(180deg, hsl(222 47% 8%), hsl(222 47% 4%));
+    --gradient-glow: radial-gradient(ellipse at center, hsl(174 72% 50% / 0.15), transparent 70%);
+
+    /* Sidebar */
+    --sidebar-background: 222 45% 8%;
+    --sidebar-foreground: 210 20% 90%;
+    --sidebar-primary: 174 72% 50%;
+    --sidebar-primary-foreground: 222 47% 6%;
+    --sidebar-accent: 222 30% 15%;
+    --sidebar-accent-foreground: 210 20% 90%;
+    --sidebar-border: 222 25% 18%;
+    --sidebar-ring: 174 72% 50%;
+  }
+
+  .dark {
+    /* Already dark by default */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    @apply font-semibold tracking-tight;
+  }
+
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  /* Glass Panel */
+  .glass-panel {
+    @apply bg-popover/90 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+
+  /* Map Controls */
+  .map-control {
+    @apply glass-panel rounded-xl p-2 transition-all duration-300 hover:border-primary/30;
+  }
+
+  /* Status badges */
+  .status-pending {
+    @apply bg-warning/20 text-warning border border-warning/30;
+  }
+
+  .status-approved {
+    @apply bg-success/20 text-success border border-success/30;
+  }
+
+  .status-denied {
+    @apply bg-destructive/20 text-destructive border border-destructive/30;
+  }
+
+  /* Glow effects */
+  .glow-primary {
+    box-shadow: 0 0 20px hsl(174 72% 50% / 0.3), 0 0 40px hsl(174 72% 50% / 0.1);
+  }
+
+  .glow-success {
+    box-shadow: 0 0 15px hsl(152 69% 45% / 0.4);
+  }
+
+  /* Marker pulse animation */
+  .marker-pulse {
+    animation: marker-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes marker-pulse {
+    0%, 100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: scale(1.1);
+      opacity: 0.8;
+    }
+  }
+
+  /* Live location pulse */
+  .live-pulse {
+    animation: live-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes live-pulse {
+    0% {
+      box-shadow: 0 0 0 0 hsl(174 72% 50% / 0.7);
+    }
+    70% {
+      box-shadow: 0 0 0 15px hsl(174 72% 50% / 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 hsl(174 72% 50% / 0);
+    }
+  }
+
+  /* Fade in animation */
+  .fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Slide in from right */
+  .slide-in-right {
+    animation: slide-in-right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slide-in-right {
+    from {
+      opacity: 0;
+      transform: translateX(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+}
+
+/* MapLibre GL overrides */
+.maplibregl-map {
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+}
+
+.maplibregl-popup-content {
+  @apply glass-panel rounded-xl p-0 overflow-hidden;
+  background: hsl(222 45% 8% / 0.95) !important;
+  border: 1px solid hsl(210 20% 95% / 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+}
+
+.maplibregl-popup-close-button {
+  @apply text-foreground/60 hover:text-foreground text-xl p-2;
+}
+
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: hsl(222 45% 8% / 0.95) !important;
+}
+
+.maplibregl-ctrl-attrib {
+  @apply bg-background/80 backdrop-blur-sm text-muted-foreground text-xs;
+}
+
+.maplibregl-ctrl-group {
+  @apply glass-panel rounded-xl overflow-hidden;
+  background: hsl(222 45% 8% / 0.9) !important;
+  border: 1px solid hsl(210 20% 95% / 0.1) !important;
+}
+
+.maplibregl-ctrl-group button {
+  @apply text-foreground hover:bg-primary/20 transition-colors;
+}
+
+.maplibregl-ctrl-group button + button {
+  border-top: 1px solid hsl(210 20% 95% / 0.1) !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-muted/50 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50;
+}
+
+/* Focus styles */
+*:focus-visible {
+  @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+}
