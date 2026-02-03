@@ -12,7 +12,7 @@ const ALL_REQUIRED_FILES = [
   '.github/ISSUE_TEMPLATE/feature-ticket.md',
   '.github/ISSUE_TEMPLATE/testing-qa.md',
   '.github/ISSUE_TEMPLATE/bug-report.md',
-  '.github/ISSUE_TEMPLATE/pull_request_template.md',
+  '.github/ISSUE_TEMPLATE/pull-request-template.md',
   
   // Public assets
   'public/favicon.ico',
