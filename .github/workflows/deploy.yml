@@ -18,6 +18,9 @@ jobs:
         with:
           bun-version: 'latest'
       
+      - name: Validate project
+        run: bun scripts/validate.cjs
+        
       - name: Check backend type
         id: check-backend
         run: |
@@ -63,7 +66,11 @@ jobs:
         run: bun install
           
       - name: Build project
-        run: bun run build
+        run: |
+          echo "🔨 Building with environment variables:"
+          echo "VITE_API_URL=$VITE_API_URL"
+          echo "VITE_SUPABASE_URL=$VITE_SUPABASE_URL"
+          bun run build
           
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25
