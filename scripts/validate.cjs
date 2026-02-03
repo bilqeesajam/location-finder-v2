@@ -9,10 +9,10 @@ console.log('=============================================\n');
 // ALL FILES FROM THE ORIGINAL TEMPLATE - MUST EXIST
 const ALL_REQUIRED_FILES = [
   // GitHub templates
-  // '.github/ISSUE_TEMPLATE/feature-ticket.md',
-  // '.github/ISSUE_TEMPLATE/testing-qa.md',
-  // '.github/ISSUE_TEMPLATE/bug-report.md',
-  // '.github/ISSUE_TEMPLATE/pull_request_template.md',
+  '.github/ISSUE_TEMPLATE/feature-ticket.md',
+  '.github/ISSUE_TEMPLATE/testing-qa.md',
+  '.github/ISSUE_TEMPLATE/bug-report.md',
+  '.github/ISSUE_TEMPLATE/pull_request_template.md',
   
   // Public assets
   'public/favicon.ico',
