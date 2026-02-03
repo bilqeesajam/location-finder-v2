@@ -16,38 +16,28 @@ jobs:
           bun-version: 'latest'
           
       - name: Validate project structure
-        id: validation
         run: |
-          echo "🔍 Starting validation..."
-          echo "Current directory: $(pwd)"
-          echo "Node version: $(node --version)"
+          echo "🔍 Running strict validation..."
+          echo "This will FAIL if any required files are missing"
           
-          # Run validation with explicit exit code check
-          if bun scripts/validate.cjs; then
-            echo "✅ Validation passed"
-            echo "status=passed" >> $GITHUB_OUTPUT
-          else
-            echo "❌ Validation failed with exit code: $?"
-            echo "status=failed" >> $GITHUB_OUTPUT
-            exit 1  # Make sure CI fails
-          fi
+          # Run validation - it WILL exit with code 1 if files missing
+          node scripts/validate.cjs
+          
+          # If we get here, validation passed
+          echo "✅ Validation passed - all required files exist"
           
       - name: Install dependencies
-        if: steps.validation.outputs.status == 'passed'
         run: bun install
           
       - name: Type check
-        if: steps.validation.outputs.status == 'passed'
         run: bunx tsc --noEmit
           
       - name: Build project
-        if: steps.validation.outputs.status == 'passed'
         run: bun run build
           
       - name: Run tests
-        if: steps.validation.outputs.status == 'passed'
         run: bun run test
           
-      # Lint check commented out - template components violate ESLint rules
+      # Lint check commented out
       # - name: Lint check
       #   run: bun run lint
