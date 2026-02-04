@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { Sidebar } from "./ui/sidebar";
 
 type FilterStatus = "all" | "pending" | "approved" | "denied";
 
@@ -33,9 +34,18 @@ export function AdminDashboard() {
   const [filter, setFilter] = useState<FilterStatus>("pending");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
+  // pagination
+  const [page, setPage] = useState(1);
+  const pageSize = 9;
+
   const { isAdmin, isLoading: authLoading } = useAuth();
   const { locations, isLoading, updateLocationStatus, deleteLocation } =
     useLocations();
+
+  const changeFilter = (status: FilterStatus) => {
+    setFilter(status);
+    setPage(1);
+  };
 
   if (authLoading || isLoading) {
     return (
@@ -53,6 +63,16 @@ export function AdminDashboard() {
     if (filter === "all") return true;
     return loc.status === filter;
   });
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredLocations.length / pageSize),
+  );
+  const startIndex = (page - 1) * pageSize;
+  const pagedLocations = filteredLocations.slice(
+    startIndex,
+    startIndex + pageSize,
+  );
 
   const handleApprove = async (id: string) => {
     setProcessingId(id);
@@ -112,7 +132,7 @@ export function AdminDashboard() {
                   key={status}
                   variant={filter === status ? "default" : "secondary"}
                   size="sm"
-                  onClick={() => setFilter(status)}
+                  onClick={() => changeFilter(status)}
                   className={cn(
                     "capitalize",
                     filter === status && "bg-gradient-primary",
@@ -138,17 +158,47 @@ export function AdminDashboard() {
             </p>
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredLocations.map((location) => (
-              <LocationCard
-                key={location.id}
-                location={location}
-                isProcessing={processingId === location.id}
-                onApprove={() => handleApprove(location.id)}
-                onDeny={() => handleDeny(location.id)}
-                onDelete={() => handleDelete(location.id)}
-              />
-            ))}
+          <div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {pagedLocations.map((location) => (
+                <LocationCard
+                  key={location.id}
+                  location={location}
+                  isProcessing={processingId === location.id}
+                  onApprove={() => handleApprove(location.id)}
+                  onDeny={() => handleDeny(location.id)}
+                  onDelete={() => handleDelete(location.id)}
+                />
+              ))}
+            </div>
+
+            {filteredLocations.length > pageSize && (
+              <div className="flex items-center justify-center gap-3 mt-8">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                >
+                  Prev
+                </Button>
+
+                <span className="text-sm text-muted-foreground">
+                  Page {page} of {totalPages}
+                </span>
+
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() =>
+                    setPage((p) => Math.min(totalPages, p + 1))
+                  }
+                  disabled={page === totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
