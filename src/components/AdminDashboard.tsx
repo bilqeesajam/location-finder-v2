@@ -34,7 +34,17 @@ export function AdminDashboard() {
   const [filter, setFilter] = useState<FilterStatus>("pending");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  // pagination
+  /**
+   * ============================
+   * PAGINATION STATE (TEST ENTRY POINT)
+   * ============================
+   * - `page` controls the current page number
+   * - `pageSize` controls how many location cards appear per page
+   *
+   * TESTING NOTES:
+   * - Verify that only `pageSize` number of cards appear at a time
+   * - Verify page starts at 1 by default
+   */
   const [page, setPage] = useState(1);
   const pageSize = 9;
 
@@ -42,6 +52,13 @@ export function AdminDashboard() {
   const { locations, isLoading, updateLocationStatus, deleteLocation } =
     useLocations();
 
+  /**
+   * FILTER CHANGE HANDLER
+   *
+   * TESTING NOTES:
+   * - When switching between filters (All / Pending / Approved / Denied),
+   *   pagination should RESET back to page 1.
+   */
   const changeFilter = (status: FilterStatus) => {
     setFilter(status);
     setPage(1);
@@ -59,15 +76,42 @@ export function AdminDashboard() {
     return <Navigate to="/" replace />;
   }
 
+  /**
+   * FILTERED DATASET
+   *
+   * TESTING NOTES:
+   * - Pagination operates on THIS filtered list
+   * - Ensure pagination count updates correctly per filter
+   */
   const filteredLocations = locations.filter((loc) => {
     if (filter === "all") return true;
     return loc.status === filter;
   });
 
+  /**
+   * ============================
+   * PAGINATION CALCULATIONS
+   * ============================
+   *
+   * TESTING NOTES:
+   * - `totalPages` should update dynamically based on dataset size
+   * - Verify total pages calculation when:
+   *   - Adding new locations
+   *   - Deleting locations
+   *   - Switching filters
+   */
   const totalPages = Math.max(
     1,
     Math.ceil(filteredLocations.length / pageSize),
   );
+
+  /**
+   * Determines which slice of data to show for the current page
+   *
+   * TESTING NOTES:
+   * - Page 1 should show items 0 → pageSize
+   * - Page 2 should show items pageSize → pageSize * 2
+   */
   const startIndex = (page - 1) * pageSize;
   const pagedLocations = filteredLocations.slice(
     startIndex,
@@ -159,6 +203,7 @@ export function AdminDashboard() {
           </div>
         ) : (
           <div>
+            {/* PAGINATED GRID (TEST TARGET) */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {pagedLocations.map((location) => (
                 <LocationCard
@@ -172,8 +217,12 @@ export function AdminDashboard() {
               ))}
             </div>
 
+            {/* PAGINATION CONTROLS */}
             {filteredLocations.length > pageSize && (
               <div className="flex items-center justify-center gap-3 mt-8">
+                {/* TESTING NOTES:
+                    - "Prev" should be disabled on page 1
+                    - Clicking "Prev" should move back one page */}
                 <Button
                   variant="secondary"
                   size="sm"
@@ -183,10 +232,15 @@ export function AdminDashboard() {
                   Prev
                 </Button>
 
+                {/* TESTING NOTES:
+                    - Page indicator should always reflect current page correctly */}
                 <span className="text-sm text-muted-foreground">
                   Page {page} of {totalPages}
                 </span>
 
+                {/* TESTING NOTES:
+                    - "Next" should be disabled on the last page
+                    - Clicking "Next" should advance one page */}
                 <Button
                   variant="secondary"
                   size="sm"
