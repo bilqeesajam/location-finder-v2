@@ -50,7 +50,7 @@ export function Sidebar({ isAddingLocation, onToggleAddLocation }: SidebarProps)
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed right-0 top-0 h-full w-80 glass-panel z-40 flex flex-col transition-transform duration-300',
+          'fixed right-0 top-0 h-full w-80 glass-panel z-40 flex flex-col transition-transform duration-300 ',
           'md:translate-x-0',
           isOpen ? 'translate-x-0' : 'translate-x-full md:translate-x-0'
         )}
