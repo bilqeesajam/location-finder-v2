@@ -30,6 +30,46 @@ export const mockDangerZones: DangerZone[] = [
     message: "Restricted access. Avoid entering.",
     severity: "medium",
   },
+  {
+    lat: 40.07448,
+    lng: -74.08494,
+    radius: 220,
+    title: "Traffic Closure",
+    message: "Reported road closure nearby. Expect delays.",
+    severity: "high",
+  },
+  {
+    lat: 40.07566,
+    lng: -74.08391,
+    radius: 200,
+    title: "Blocked Segment",
+    message: "Traffic incident marked as closed.",
+    severity: "medium",
+  },
+  {
+    lat: 40.07226,
+    lng: -74.05618,
+    radius: 260,
+    title: "Congested Corridor",
+    message: "Slowdowns detected along this segment.",
+    severity: "medium",
+  },
+  {
+    lat: 40.07112,
+    lng: -74.06313,
+    radius: 240,
+    title: "Incident Cluster",
+    message: "Multiple closures reported in this area.",
+    severity: "high",
+  },
+  {
+    lat: -33.920687,
+    lng: 18.418735,
+    radius: 300,
+    title: "Geofence Nearby",
+    message: "Test danger zone from geofencing data.",
+    severity: "low",
+  },
 ];
 
 // Fake routes/roads near the zones for visual emphasis

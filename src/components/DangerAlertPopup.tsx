@@ -6,6 +6,7 @@ type DangerAlertPopupProps = {
   title: string;
   message: string;
   onDismiss: () => void;
+  offsetBottom?: number;
 };
 
 export function DangerAlertPopup({
@@ -13,6 +14,7 @@ export function DangerAlertPopup({
   title,
   message,
   onDismiss,
+  offsetBottom = 16,
 }: DangerAlertPopupProps) {
   const isDanger = status === "danger";
 
@@ -31,6 +33,15 @@ export function DangerAlertPopup({
             padding: 12px 14px;
             box-shadow: 0 12px 30px rgba(0,0,0,0.25);
           }
+
+          @media (min-width: 768px) {
+            .danger-alert-popup {
+              left: 16px;
+              top: auto;
+              bottom: var(--danger-alert-bottom, 16px);
+              transform: none;
+            }
+          }
         `}
       </style>
       <div
@@ -41,6 +52,7 @@ export function DangerAlertPopup({
           background: isDanger ? "#fee2e2" : "#fef3c7",
           border: `1px solid ${isDanger ? "#ef4444" : "#f59e0b"}`,
           color: "#111827",
+          ["--danger-alert-bottom" as string]: `${offsetBottom}px`,
         }}
       >
       <div

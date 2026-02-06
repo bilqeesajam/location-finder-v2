@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 import { useDangerAlerts } from '@/hooks/useDangerAlerts';
 import { DangerAlertPopup } from '@/components/DangerAlertPopup';
 import { DangerSeverityPopup } from '@/components/DangerSeverityPopup';
-import { useTomTomSafetyZones } from '@/hooks/useTomTomSafetyZones';
 import { mockDangerZones } from '@/data/mockDangerZones';
 
 export default function Index() {
@@ -24,9 +23,6 @@ export default function Index() {
     ? { lat: myLocation.latitude, lng: myLocation.longitude }
     : undefined;
 
-  const { zones: tomTomZones } = useTomTomSafetyZones(userLocation);
-  const combinedDangerZones = [...mockDangerZones, ...tomTomZones];
-
   const {
     alertStatus,
     alertZone,
@@ -36,7 +32,7 @@ export default function Index() {
     shouldShowRisk,
     dismiss,
     dismissRisk,
-  } = useDangerAlerts(userLocation, tomTomZones);
+  } = useDangerAlerts(userLocation);
 
   const handleToggleAddLocation = useCallback(() => {
     if (!user) {
@@ -77,7 +73,7 @@ export default function Index() {
           onMapClick={handleMapClick}
           isAddingLocation={isAddingLocation}
           userLocation={userLocation}
-          dangerZones={combinedDangerZones}
+          dangerZones={mockDangerZones}
         />
       </div>
 
@@ -95,6 +91,7 @@ export default function Index() {
           title={alertZone.title}
           message={alertZone.message}
           onDismiss={dismiss}
+          offsetBottom={shouldShowRisk ? 395 : 16}
         />
       )}
 
