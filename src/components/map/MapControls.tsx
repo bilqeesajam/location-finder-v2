@@ -1,3 +1,4 @@
+import { Box, Layers, RotateCcw, AlertTriangle } from 'lucide-react';
 import * as React from "react";
 import { Search as SearchIcon, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +8,7 @@ import {
     PopoverTrigger,
     PopoverContent,
 } from "@/components/ui/popover";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Location } from "@/hooks/useLocations";
 
@@ -14,6 +16,8 @@ interface MapControlsProps {
     is3D: boolean;
     onToggle3D: () => void;
     onResetView: () => void;
+    showDangerZones: boolean;
+    onToggleDangerZones: () => void;
     className?: string;
 
     locations: Location[];
@@ -28,18 +32,20 @@ interface MapControlsProps {
 }
 
 export function MapControls({
-                                is3D,
-                                onToggle3D,
-                                onResetView,
-                                className,
-                                locations,
-                                searchQuery,
-                                onSearchChange,
-                                onSelectLocation,
-                                selectedServices,
-                                onServiceToggle,
-                                onClearFilters,
-                            }: MapControlsProps) {
+    is3D,
+    onToggle3D,
+    onResetView,
+    showDangerZones,
+    onToggleDangerZones,
+    className,
+    locations,
+    searchQuery,
+    onSearchChange,
+    onSelectLocation,
+    selectedServices,
+    onServiceToggle,
+    onClearFilters,
+}: MapControlsProps) {
     const [isLocked, setIsLocked] = React.useState(false);
 
     const results = React.useMemo(() => {
@@ -231,6 +237,24 @@ export function MapControls({
                         </div>
                     </PopoverContent>
                 </Popover>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={onToggleDangerZones}
+                            className={cn(
+                                'h-9 w-9 transition-colors',
+                                showDangerZones && 'bg-primary/20 text-primary'
+                            )}
+                        >
+                            <AlertTriangle className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                        Toggle Danger Zones
+                    </TooltipContent>
+                </Tooltip>
             </div>
         </div>
     );

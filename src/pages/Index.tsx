@@ -6,6 +6,11 @@ import { useLocations } from '@/hooks/useLocations';
 import { useLiveLocations } from '@/hooks/useLiveLocations';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { useDangerAlerts } from '@/hooks/useDangerAlerts';
+import { DangerAlertPopup } from '@/components/DangerAlertPopup';
+import { DangerSeverityPopup } from '@/components/DangerSeverityPopup';
+import { useTomTomSafetyZones } from '@/hooks/useTomTomSafetyZones';
+import { mockDangerZones } from '@/data/mockDangerZones';
 
 export default function Index() {
   const [isAddingLocation, setIsAddingLocation] = useState(false);
@@ -14,6 +19,24 @@ export default function Index() {
   const { user } = useAuth();
   const { approvedLocations } = useLocations();
   const { othersLocations, myLocation, isSharing } = useLiveLocations();
+
+  const userLocation = myLocation
+    ? { lat: myLocation.latitude, lng: myLocation.longitude }
+    : undefined;
+
+  const { zones: tomTomZones } = useTomTomSafetyZones(userLocation);
+  const combinedDangerZones = [...mockDangerZones, ...tomTomZones];
+
+  const {
+    alertStatus,
+    alertZone,
+    shouldShow,
+    riskLevel,
+    riskZone,
+    shouldShowRisk,
+    dismiss,
+    dismissRisk,
+  } = useDangerAlerts(userLocation, tomTomZones);
 
   const handleToggleAddLocation = useCallback(() => {
     if (!user) {
@@ -53,8 +76,27 @@ export default function Index() {
           liveLocations={allLiveLocations}
           onMapClick={handleMapClick}
           isAddingLocation={isAddingLocation}
+          userLocation={userLocation}
+          dangerZones={combinedDangerZones}
         />
       </div>
+
+      {shouldShowRisk && riskZone && (
+        <DangerSeverityPopup
+          level={riskLevel as 'low' | 'medium' | 'high'}
+          offsetBottom={shouldShow ? 110 : 16}
+          onDismiss={dismissRisk}
+        />
+      )}
+
+      {shouldShow && alertZone && (
+        <DangerAlertPopup
+          status={alertStatus as 'warning' | 'danger'}
+          title={alertZone.title}
+          message={alertZone.message}
+          onDismiss={dismiss}
+        />
+      )}
 
       {/* Sidebar */}
       <Sidebar

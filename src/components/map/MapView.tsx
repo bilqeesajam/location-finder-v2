@@ -5,6 +5,39 @@ import { Location } from '@/hooks/useLocations';
 import { LiveLocation } from '@/hooks/useLiveLocations';
 import { MapControls } from './MapControls';
 import { cn } from '@/lib/utils';
+import{ mockDangerRoutes, type DangerZone } from '@/data/mockDangerZones';
+
+const DANGER_ZONE_SOURCE_ID = 'danger-zones';
+const DANGER_ROUTE_SOURCE_ID = 'danger-routes';
+const DANGER_ZONE_FILL_ID = 'danger-zone-fill';
+const DANGER_ZONE_OUTLINE_ID = 'danger-zone-outline';
+const DANGER_ROUTE_LINE_ID = 'danger-route-line';
+
+function toRad(value: number) {
+    return (value * Math.PI) / 180;
+}
+
+function circlePolygon(lng: number, lat: number, radiusMeters: number, steps = 64) {
+    const coordinates: Array<[number, number]> = [];
+    const earthRadius = 6371000;
+    const angularDistance = radiusMeters / earthRadius;
+    const latRad = toRad(lat);
+    const lngRad = toRad(lng);
+
+    for (let i = 0; i <= steps; i++) {
+        const bearing = (i / steps) * Math.PI * 2;
+        const sinLat = Math.sin(latRad) * Math.cos(angularDistance) + Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing);
+        const newLat = Math.asin(sinLat);
+        const newLng = lngRad + Math.atan2(
+            Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latRad),
+            Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(newLat)
+        );
+
+        coordinates.push([newLng * (180 / Math.PI), newLat * (180 / Math.PI)]);
+    }
+
+    return coordinates;
+}
 
 interface MapViewProps {
     locations: Location[];
@@ -12,6 +45,8 @@ interface MapViewProps {
     onMapClick?: (lng: number, lat: number) => void;
     isAddingLocation?: boolean;
     className?: string;
+    userLocation?: { lat: number; lng: number };
+    dangerZones?: DangerZone[];
 }
 
 const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY as string;
@@ -22,6 +57,8 @@ export function MapView({
                             onMapClick,
                             isAddingLocation,
                             className,
+                            userLocation,
+                            dangerZones = [],
                         }: MapViewProps) {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
@@ -35,6 +72,7 @@ export function MapView({
     const [is3D, setIs3D] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedServices, setSelectedServices] = useState<string[]>([]);
+    const [showDangerZones, setShowDangerZones] = useState(true);
 
     // ✅ NEW: clear filters handler (this is the "where would this be")
     const handleClearFilters = useCallback(() => {
@@ -95,6 +133,51 @@ export function MapView({
             prev.includes(service) ? prev.filter((s) => s !== service) : [...prev, service]
         );
     }, []);
+
+    const dangerZonesGeoJson = useMemo(() => {
+        const zones: DangerZone[] = userLocation
+            ? [
+                {
+                    lat: userLocation.lat,
+                    lng: userLocation.lng,
+                    radius: 140,
+                    title: 'Live Test Zone',
+                    message: 'Live test zone centered on your location.',
+                    severity: 'high',
+                },
+                ...dangerZones,
+            ]
+            : dangerZones;
+
+        return {
+            type: 'FeatureCollection' as const,
+            features: zones.map((zone) => ({
+                type: 'Feature' as const,
+                properties: {
+                    title: zone.title,
+                    severity: zone.severity ?? 'high',
+                },
+                geometry: {
+                    type: 'Polygon' as const,
+                    coordinates: [circlePolygon(zone.lng, zone.lat, zone.radius)],
+                },
+            })),
+        };
+    }, [userLocation, dangerZones]);
+
+    const dangerRoutesGeoJson = useMemo(() => ({
+        type: 'FeatureCollection' as const,
+        features: mockDangerRoutes.map((route) => ({
+            type: 'Feature' as const,
+            properties: {
+                id: route.id,
+            },
+            geometry: {
+                type: 'LineString' as const,
+                coordinates: route.coordinates,
+            },
+        })),
+    }), []);
 
     useEffect(() => {
         onMapClickRef.current = onMapClick;
@@ -258,6 +341,106 @@ export function MapView({
         });
     }, [liveLocations, isLoaded]);
 
+    // Add mock danger zones + routes
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+
+        const mapInstance = map.current;
+
+        if (!mapInstance.getSource(DANGER_ZONE_SOURCE_ID)) {
+            mapInstance.addSource(DANGER_ZONE_SOURCE_ID, {
+                type: 'geojson',
+                data: dangerZonesGeoJson,
+            });
+
+            mapInstance.addLayer({
+                id: DANGER_ZONE_FILL_ID,
+                type: 'fill',
+                source: DANGER_ZONE_SOURCE_ID,
+                paint: {
+                    'fill-color': [
+                        'match',
+                        ['get', 'severity'],
+                        'high',
+                        '#EF4444',
+                        'medium',
+                        '#F97316',
+                        'low',
+                        '#FACC15',
+                        '#EF4444',
+                    ],
+                    'fill-opacity': 0.45,
+                },
+                layout: {
+                    visibility: showDangerZones ? 'visible' : 'none',
+                },
+            });
+
+            mapInstance.addLayer({
+                id: DANGER_ZONE_OUTLINE_ID,
+                type: 'line',
+                source: DANGER_ZONE_SOURCE_ID,
+                paint: {
+                    'line-color': [
+                        'match',
+                        ['get', 'severity'],
+                        'high',
+                        '#EF4444',
+                        'medium',
+                        '#F97316',
+                        'low',
+                        '#FACC15',
+                        '#EF4444',
+                    ],
+                    'line-width': 2,
+                    'line-opacity': 0.9,
+                },
+                layout: {
+                    visibility: showDangerZones ? 'visible' : 'none',
+                },
+            });
+        } else {
+            const source = mapInstance.getSource(DANGER_ZONE_SOURCE_ID) as maplibregl.GeoJSONSource;
+            source.setData(dangerZonesGeoJson);
+        }
+
+        if (!mapInstance.getSource(DANGER_ROUTE_SOURCE_ID)) {
+            mapInstance.addSource(DANGER_ROUTE_SOURCE_ID, {
+                type: 'geojson',
+                data: dangerRoutesGeoJson,
+            });
+
+            mapInstance.addLayer({
+                id: DANGER_ROUTE_LINE_ID,
+                type: 'line',
+                source: DANGER_ROUTE_SOURCE_ID,
+                paint: {
+                    'line-color': '#B91C1C',
+                    'line-width': 4,
+                    'line-opacity': 0.85,
+                },
+                layout: {
+                    visibility: showDangerZones ? 'visible' : 'none',
+                },
+            });
+        }
+    }, [dangerZonesGeoJson, dangerRoutesGeoJson, isLoaded, showDangerZones]);
+
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+
+        const visibility = showDangerZones ? 'visible' : 'none';
+        if (map.current.getLayer(DANGER_ZONE_FILL_ID)) {
+            map.current.setLayoutProperty(DANGER_ZONE_FILL_ID, 'visibility', visibility);
+        }
+        if (map.current.getLayer(DANGER_ZONE_OUTLINE_ID)) {
+            map.current.setLayoutProperty(DANGER_ZONE_OUTLINE_ID, 'visibility', visibility);
+        }
+        if (map.current.getLayer(DANGER_ROUTE_LINE_ID)) {
+            map.current.setLayoutProperty(DANGER_ROUTE_LINE_ID, 'visibility', visibility);
+        }
+    }, [showDangerZones, isLoaded]);
+
     // ---- SEARCH SELECT HANDLER ----
     const handleSelectLocation = useCallback((loc: Location) => {
         if (!map.current) return;
@@ -292,6 +475,8 @@ export function MapView({
                 is3D={is3D}
                 onToggle3D={() => setIs3D((v) => !v)}
                 onResetView={() => map.current?.flyTo({ center: [0, 20], zoom: 2, pitch: 0 })}
+                showDangerZones={showDangerZones}
+                onToggleDangerZones={() => setShowDangerZones((prev) => !prev)}
                 locations={locations}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
