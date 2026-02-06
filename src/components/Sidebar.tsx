@@ -87,6 +87,14 @@ export function Sidebar({ isAddingLocation, onToggleAddLocation }: SidebarProps)
               <p className="text-2xl font-bold">{othersLocations.length + (isSharing ? 1 : 0)}</p>
             </div>
           </div>
+          <br />
+          <Link to="/profile" className="col-span-2">
+            <div className="col-span-2">
+              <Button className="w-full bg-gradient-primary hover:opacity-90">
+                Profile
+              </Button>
+            </div>
+           </Link>
 
           {/* Actions */}
           {user && (
