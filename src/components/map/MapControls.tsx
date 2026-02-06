@@ -1,12 +1,8 @@
 import * as React from "react";
-import { Search as SearchIcon, SlidersHorizontal } from "lucide-react";
+import { Search as SearchIcon, SlidersHorizontal, MapPin, Landmark, Map } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-    Popover,
-    PopoverTrigger,
-    PopoverContent,
-} from "@/components/ui/popover";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Location } from "@/hooks/useLocations";
 
@@ -25,6 +21,31 @@ interface MapControlsProps {
     onServiceToggle: (service: string) => void;
 
     onClearFilters: () => void;
+
+    // ✅ NEW: MapTiler geocode select
+    onSelectGeocode: (lng: number, lat: number, label: string, zoom?: number) => void;
+}
+
+type GeocodeFeature = {
+    id?: string;
+    place_name?: string;
+    text?: string;
+    center?: [number, number]; // [lng, lat]
+    place_type?: string[];     // e.g. ["address"], ["poi"], ["place"]
+    properties?: {
+        // sometimes has useful stuff, depends on result
+        name?: string;
+    };
+};
+
+const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY as string;
+
+function getType(feature: GeocodeFeature): string {
+    return feature.place_type?.[0] || "unknown";
+}
+
+function pickLabel(feature: GeocodeFeature): string {
+    return feature.place_name || feature.text || feature.properties?.name || "Selected place";
 }
 
 export function MapControls({
@@ -39,10 +60,15 @@ export function MapControls({
                                 selectedServices,
                                 onServiceToggle,
                                 onClearFilters,
+                                onSelectGeocode,
                             }: MapControlsProps) {
     const [isLocked, setIsLocked] = React.useState(false);
 
-    const results = React.useMemo(() => {
+    const [geoResults, setGeoResults] = React.useState<GeocodeFeature[]>([]);
+    const [geoLoading, setGeoLoading] = React.useState(false);
+
+    // local (your DB) results
+    const localResults = React.useMemo(() => {
         const q = searchQuery.trim().toLowerCase();
         if (!q || isLocked) return [];
         return locations.filter(
@@ -52,15 +78,96 @@ export function MapControls({
         );
     }, [locations, searchQuery, isLocked]);
 
+    // MapTiler geocode results (addresses + attractions + fallback places)
+    React.useEffect(() => {
+        const q = searchQuery.trim();
+        if (!q || isLocked) {
+            setGeoResults([]);
+            setGeoLoading(false);
+            return;
+        }
+        if (!MAPTILER_API_KEY) {
+            setGeoResults([]);
+            setGeoLoading(false);
+            return;
+        }
+
+        const controller = new AbortController();
+
+        const run = window.setTimeout(async () => {
+            try {
+                setGeoLoading(true);
+
+                const base =
+                    `https://api.maptiler.com/geocoding/${encodeURIComponent(q)}.json` +
+                    `?key=${MAPTILER_API_KEY}` +
+                    `&autocomplete=true` +
+                    `&limit=8`;
+
+                // 1) addresses + POIs (attractions)
+                const urlPrimary = base + `&types=address,poi`;
+                const res1 = await fetch(urlPrimary, { signal: controller.signal });
+                if (!res1.ok) throw new Error(`Geocoding failed: ${res1.status}`);
+                const data1 = await res1.json();
+                let features: GeocodeFeature[] = Array.isArray(data1?.features) ? data1.features : [];
+
+                // 2) fallback: broader places so "New York" still returns something
+                if (features.length === 0) {
+                    const urlFallback = base + `&types=poi,address,street,neighborhood,place,locality,region,country`;
+                    const res2 = await fetch(urlFallback, { signal: controller.signal });
+                    if (res2.ok) {
+                        const data2 = await res2.json();
+                        features = Array.isArray(data2?.features) ? data2.features : [];
+                    }
+                }
+
+                setGeoResults(features);
+            } catch (e) {
+                if ((e as any)?.name !== "AbortError") setGeoResults([]);
+            } finally {
+                setGeoLoading(false);
+            }
+        }, 250);
+
+        return () => {
+            controller.abort();
+            window.clearTimeout(run);
+        };
+    }, [searchQuery, isLocked]);
+
     const handlePickLocation = (loc: Location) => {
         onSearchChange(loc.name);
         setIsLocked(true);
         onSelectLocation(loc);
     };
 
+    const handlePickGeocode = (f: GeocodeFeature) => {
+        const label = pickLabel(f);
+        const c = f.center;
+        if (!c || c.length !== 2) return;
+
+        const t = getType(f);
+
+        // Zoom defaults: address/poi closer; place/city wider
+        const zoom =
+            t === "address" ? 16 :
+                t === "poi" ? 16 :
+                    t === "street" ? 15 :
+                        t === "neighborhood" ? 14 :
+                            t === "place" || t === "locality" ? 12 :
+                                t === "region" ? 8 :
+                                    t === "country" ? 5 :
+                                        13;
+
+        onSearchChange(label);
+        setIsLocked(true);
+        onSelectGeocode(c[0], c[1], label, zoom);
+    };
+
     const handleUnlock = () => {
         setIsLocked(false);
         onSearchChange("");
+        setGeoResults([]);
     };
 
     const filterItems = [
@@ -71,6 +178,24 @@ export function MapControls({
         { key: "police", label: "Police" },
         { key: "restaurants", label: "Restaurants" },
     ];
+
+    // Group geocode results: addresses, attractions (poi), other places
+    const grouped = React.useMemo(() => {
+        const addresses: GeocodeFeature[] = [];
+        const pois: GeocodeFeature[] = [];
+        const places: GeocodeFeature[] = [];
+
+        for (const f of geoResults) {
+            const t = getType(f);
+            if (t === "address") addresses.push(f);
+            else if (t === "poi") pois.push(f);
+            else places.push(f);
+        }
+
+        return { addresses, pois, places };
+    }, [geoResults]);
+
+    const showDropdown = searchQuery.trim() && !isLocked;
 
     return (
         <div
@@ -88,18 +213,18 @@ export function MapControls({
                     />
 
                     <Input
-                        aria-label="Search locations"
+                        aria-label="Search places"
                         value={searchQuery}
                         onChange={(e) => {
                             if (isLocked) return;
                             onSearchChange(e.target.value);
                         }}
-                        placeholder="Search"
+                        placeholder="Search address or attraction"
                         readOnly={isLocked}
                         className="
               h-12
               pl-12
-              pr-4
+              pr-14
               rounded-[20px]
               bg-[#0F2A2E]/90
               text-white
@@ -122,27 +247,97 @@ export function MapControls({
                         </button>
                     )}
 
-                    {searchQuery.trim() && !isLocked && (
+                    {showDropdown && (
                         <div className="absolute left-0 right-0 mt-2 bg-popover rounded-xl shadow-lg overflow-hidden">
-                            {results.length === 0 ? (
+                            {/* Saved locations first */}
+                            {localResults.slice(0, 6).map((r) => (
+                                <button
+                                    key={`local-${r.id}`}
+                                    onClick={() => handlePickLocation(r)}
+                                    className="w-full text-left px-4 py-3 hover:bg-accent/40"
+                                >
+                                    <div className="font-semibold">{r.name}</div>
+                                    {r.description && (
+                                        <div className="text-xs text-muted-foreground truncate">
+                                            {r.description}
+                                        </div>
+                                    )}
+                                    <div className="text-[11px] text-muted-foreground mt-1">
+                                        Saved location
+                                    </div>
+                                </button>
+                            ))}
+
+                            {(localResults.length > 0 || geoResults.length > 0) && (
+                                <div className="h-px bg-border/50" />
+                            )}
+
+                            {geoLoading && (
                                 <div className="p-3 text-sm text-muted-foreground">
-                                    No results
+                                    Searching addresses & attractions…
                                 </div>
-                            ) : (
-                                results.slice(0, 6).map((r) => (
-                                    <button
-                                        key={r.id}
-                                        onClick={() => handlePickLocation(r)}
-                                        className="w-full text-left px-4 py-3 hover:bg-accent/40"
-                                    >
-                                        <div className="font-semibold">{r.name}</div>
-                                        {r.description && (
-                                            <div className="text-xs text-muted-foreground truncate">
-                                                {r.description}
+                            )}
+
+                            {!geoLoading && geoResults.length === 0 && localResults.length === 0 && (
+                                <div className="p-3 text-sm text-muted-foreground">No results</div>
+                            )}
+
+                            {!geoLoading && geoResults.length > 0 && (
+                                <div className="py-2">
+                                    {grouped.addresses.length > 0 && (
+                                        <div className="px-4 pt-2 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                            <MapPin className="h-3 w-3" /> Addresses
+                                        </div>
+                                    )}
+                                    {grouped.addresses.slice(0, 5).map((f, idx) => (
+                                        <button
+                                            key={`addr-${f.id || idx}`}
+                                            onClick={() => handlePickGeocode(f)}
+                                            className="w-full text-left px-4 py-3 hover:bg-accent/40"
+                                        >
+                                            <div className="font-semibold">{pickLabel(f)}</div>
+                                            <div className="text-[11px] text-muted-foreground mt-1">
+                                                Address
                                             </div>
-                                        )}
-                                    </button>
-                                ))
+                                        </button>
+                                    ))}
+
+                                    {grouped.pois.length > 0 && (
+                                        <div className="px-4 pt-2 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                            <Landmark className="h-3 w-3" /> Attractions
+                                        </div>
+                                    )}
+                                    {grouped.pois.slice(0, 5).map((f, idx) => (
+                                        <button
+                                            key={`poi-${f.id || idx}`}
+                                            onClick={() => handlePickGeocode(f)}
+                                            className="w-full text-left px-4 py-3 hover:bg-accent/40"
+                                        >
+                                            <div className="font-semibold">{pickLabel(f)}</div>
+                                            <div className="text-[11px] text-muted-foreground mt-1">
+                                                Attraction / POI
+                                            </div>
+                                        </button>
+                                    ))}
+
+                                    {grouped.places.length > 0 && (
+                                        <div className="px-4 pt-2 pb-1 text-[11px] uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                            <Map className="h-3 w-3" /> Places
+                                        </div>
+                                    )}
+                                    {grouped.places.slice(0, 6).map((f, idx) => (
+                                        <button
+                                            key={`place-${f.id || idx}`}
+                                            onClick={() => handlePickGeocode(f)}
+                                            className="w-full text-left px-4 py-3 hover:bg-accent/40"
+                                        >
+                                            <div className="font-semibold">{pickLabel(f)}</div>
+                                            <div className="text-[11px] text-muted-foreground mt-1">
+                                                {getType(f)}
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
                             )}
                         </div>
                     )}
@@ -165,7 +360,6 @@ export function MapControls({
                         </Button>
                     </PopoverTrigger>
 
-                    {/* ✅ themed popover */}
                     <PopoverContent
                         align="end"
                         className="bg-[#15292F] text-white border border-white/10 shadow-xl"
@@ -188,7 +382,6 @@ export function MapControls({
                                 </button>
                             </div>
 
-                            {/* ✅ themed filter chips */}
                             <div className="grid grid-cols-2 gap-2">
                                 {filterItems.map((item) => {
                                     const active = selectedServices.includes(item.key);
@@ -210,9 +403,7 @@ export function MapControls({
                                 })}
                             </div>
 
-                            <div className="text-sm font-medium mt-2 text-white/90">
-                                Coming Soon
-                            </div>
+                            <div className="text-sm font-medium mt-2 text-white/90">Coming Soon</div>
 
                             <div className="flex gap-2">
                                 {[

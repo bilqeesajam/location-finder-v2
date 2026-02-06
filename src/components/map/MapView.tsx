@@ -36,27 +36,15 @@ export function MapView({
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
-    // ✅ NEW: clear filters handler (this is the "where would this be")
-    const handleClearFilters = useCallback(() => {
-        setSelectedServices([]);
-    }, []);
-
-    // ---- service matching ----
     const matchesService = (loc: Location, service: string) => {
         const text = (loc.name + ' ' + (loc.description || '')).toLowerCase();
-
         const keywords: Record<string, string[]> = {
-            // ✅ requested types
-            clinic: ['clinic', 'medical', 'health', 'doctor', 'hospital', 'er', 'emergency'],
-            library: ['library'],
-            shelter: ['shelter', 'homeless', 'safe house', 'refuge', 'refugee', 'crisis'],
-
-            // keep your existing ones
             hospitals: ['hospital', 'clinic', 'medical', 'health', 'emergency'],
             police: ['police', 'precinct', 'station'],
+            library: ['library'],
             restaurants: ['restaurant', 'cafe', 'café', 'diner', 'bistro', 'eatery'],
-
-            // coming soon
+            clinic: ['clinic'],
+            shelter: ['shelter'],
             parks: ['park', 'garden'],
             roads: ['road', 'street', 'rd', 'st'],
         };
@@ -64,14 +52,12 @@ export function MapView({
         return (keywords[service] || []).some((k) => text.includes(k));
     };
 
-    // ---- filtering ----
     const filteredLocations = useMemo(() => {
         let res = locations;
 
         if (selectedServices.length > 0) {
             res = res.filter((l) =>
                 selectedServices.some((s) => {
-                    // keep your “coming soon” exclusion
                     if (s === 'parks' || s === 'roads') return false;
                     return matchesService(l, s);
                 })
@@ -96,12 +82,15 @@ export function MapView({
         );
     }, []);
 
+    const handleClearFilters = useCallback(() => {
+        setSelectedServices([]);
+    }, []);
+
     useEffect(() => {
         onMapClickRef.current = onMapClick;
         isAddingLocationRef.current = isAddingLocation;
     }, [onMapClick, isAddingLocation]);
 
-    // ---- MAP INIT ----
     useEffect(() => {
         if (!mapContainer.current || map.current) return;
 
@@ -140,6 +129,7 @@ export function MapView({
         map.current.on('load', () => {
             setIsLoaded(true);
 
+            // 3D buildings (if style supports openmaptiles)
             if (map.current?.getSource('openmaptiles')) {
                 const layers = map.current.getStyle().layers;
                 const labelLayerId = layers?.find(
@@ -184,7 +174,7 @@ export function MapView({
         map.current.getCanvas().style.cursor = isAddingLocation ? 'crosshair' : '';
     }, [isAddingLocation]);
 
-    // ---- LOCATION MARKERS ----
+    // markers (your saved locations)
     useEffect(() => {
         if (!map.current || !isLoaded) return;
 
@@ -225,7 +215,7 @@ export function MapView({
         });
     }, [filteredLocations, isLoaded]);
 
-    // ---- LIVE MARKERS ----
+    // live markers
     useEffect(() => {
         if (!map.current || !isLoaded) return;
 
@@ -258,7 +248,7 @@ export function MapView({
         });
     }, [liveLocations, isLoaded]);
 
-    // ---- SEARCH SELECT HANDLER ----
+    // from your DB locations (search dropdown “Saved location”)
     const handleSelectLocation = useCallback((loc: Location) => {
         if (!map.current) return;
 
@@ -271,13 +261,37 @@ export function MapView({
 
         setTimeout(() => {
             popupRef.current?.remove();
-
             popupRef.current = new maplibregl.Popup({ offset: 25 })
                 .setLngLat([loc.longitude, loc.latitude])
                 .setHTML(`
           <div class="p-4 min-w-[200px]">
             <h3 class="font-semibold text-lg">${loc.name}</h3>
             ${loc.description ?? ''}
+          </div>
+        `)
+                .addTo(map.current!);
+        }, 600);
+    }, []);
+
+    // from MapTiler geocoding (addresses + attractions)
+    const handleSelectGeocode = useCallback((lng: number, lat: number, label: string, zoom?: number) => {
+        if (!map.current) return;
+
+        map.current.flyTo({
+            center: [lng, lat],
+            zoom: zoom ?? 15,
+            duration: 1800,
+            essential: true,
+        });
+
+        setTimeout(() => {
+            popupRef.current?.remove();
+            popupRef.current = new maplibregl.Popup({ offset: 25 })
+                .setLngLat([lng, lat])
+                .setHTML(`
+          <div class="p-4 min-w-[220px]">
+            <h3 class="font-semibold text-lg">${label}</h3>
+            <p class="text-xs text-muted-foreground mt-1">${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
           </div>
         `)
                 .addTo(map.current!);
@@ -295,10 +309,11 @@ export function MapView({
                 locations={locations}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
+                onSelectLocation={handleSelectLocation}
                 selectedServices={selectedServices}
                 onServiceToggle={toggleService}
-                onClearFilters={handleClearFilters}  // ✅ NEW
-                onSelectLocation={handleSelectLocation}
+                onClearFilters={handleClearFilters}
+                onSelectGeocode={handleSelectGeocode}
             />
 
             {!isLoaded && (
