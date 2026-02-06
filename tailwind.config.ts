@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import tailwindcssAnimate from "tailwindcss-animate";
 
 export default {
   darkMode: ["class"],
@@ -105,8 +106,8 @@ export default {
         "pulse-ring": "pulse-ring 1.5s ease-out infinite",
       },
       backgroundImage: {
-        "gradient-primary": "linear-gradient(135deg, hsl(var(--primary)), hsl(199 89% 48%))",
-        "gradient-dark": "linear-gradient(180deg, hsl(var(--background)), hsl(222 47% 4%))",
+        "gradient-primary": "linear-gradient(135deg, hsl(var(--primary)), hsl(162, 100%, 30%))",
+        "gradient-dark": "linear-gradient(180deg, hsl(var(--background)), hsl(210, 41%, 16%))",
       },
       boxShadow: {
         glow: "0 0 20px hsl(var(--primary) / 0.3), 0 0 40px hsl(var(--primary) / 0.1)",
@@ -114,5 +115,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [tailwindcssAnimate],
 } satisfies Config;
