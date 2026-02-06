@@ -94,8 +94,8 @@ export function MapView({
     if (selectedServices.length > 0) {
       res = res.filter((l) =>
         selectedServices.some((s) => {
-          // keep your “coming soon” exclusion
-          if (s === "parks" || s === "roads") return false;
+          // keep your “coming soon” exclusion and non-location filters
+          if (s === "parks" || s === "roads" || s === "bus") return false;
           return matchesService(l, s);
         }),
       );
@@ -213,6 +213,20 @@ export function MapView({
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
+    const showBusRoute = selectedServices.includes("bus");
+
+    if (!showBusRoute) {
+      if (map.current.getLayer("bus-route-line")) {
+        map.current.setLayoutProperty("bus-route-line", "visibility", "none");
+      }
+
+      if (map.current.getLayer("bus-route-stops")) {
+        map.current.setLayoutProperty("bus-route-stops", "visibility", "none");
+      }
+
+      return;
+    }
+
     let isCancelled = false;
 
     const ensureBusIcon = () =>
@@ -283,11 +297,17 @@ export function MapView({
             type: "line",
             source: "bus-route",
             paint: {
-              "line-color": "#F97316",
+              "line-color": "#c56b25",
               "line-width": 4,
               "line-opacity": 0.9,
             },
           });
+        } else {
+          map.current.setLayoutProperty(
+            "bus-route-line",
+            "visibility",
+            "visible",
+          );
         }
 
         if (!map.current.getSource("bus-route-stops")) {
@@ -320,11 +340,17 @@ export function MapView({
                 "icon-allow-overlap": true,
               },
               paint: {
-                "icon-color": "#fafafa",
+                "icon-color": "#b2fbde",
                 "icon-halo-color": "#0F2A2E",
                 "icon-halo-width": 1.5,
               },
             });
+          } else {
+            map.current.setLayoutProperty(
+              "bus-route-stops",
+              "visibility",
+              "visible",
+            );
           }
         });
 
@@ -350,7 +376,7 @@ export function MapView({
     return () => {
       isCancelled = true;
     };
-  }, [isLoaded]);
+  }, [isLoaded, selectedServices]);
 
   // ---- LOCATION MARKERS ----
   useEffect(() => {
