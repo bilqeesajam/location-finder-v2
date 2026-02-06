@@ -21,7 +21,7 @@ const NAV_ITEMS: AdminNavItem[] = [
 
 export default function AdminLayout() {
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="h-screen bg-gray-100 flex">
       {/* Sidebar - KEPT EXACTLY AS IS */}
       <aside className="hidden md:flex w-72 shrink-0 bg-background rounded-2xl overflow-hidden border border-border/50 m-3">
         <div className="w-full flex flex-col">

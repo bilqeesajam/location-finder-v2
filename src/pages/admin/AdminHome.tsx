@@ -1,10 +1,31 @@
 import { Link } from "react-router-dom";
-import { MapPin, CheckCircle2, XCircle, ArrowRight, Calendar, Bell, Check, X, Edit, Plus, Clock, AlertCircle } from "lucide-react";
+import { 
+  MapPin, 
+  CheckCircle2, 
+  XCircle, 
+  ArrowRight, 
+  Calendar, 
+  Bell, 
+  Check, 
+  X, 
+  Edit, 
+  Plus, 
+  Clock, 
+  Users 
+} from "lucide-react";
 import { useLocations } from "@/hooks/useLocations";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState, useMemo } from "react";
-import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isWithinInterval } from "date-fns";
+import { 
+  format, 
+  subDays, 
+  startOfWeek, 
+  endOfWeek, 
+  startOfMonth, 
+  endOfMonth, 
+  isWithinInterval 
+} from "date-fns";
 
 // Define a local type that includes all the properties we need
 interface ActivityItem {
@@ -25,8 +46,47 @@ interface NotificationItem {
   timestamp: Date;
 }
 
+// Update Location interface to include all needed properties
+interface Location {
+  id: string | number;
+  name: string;
+  status: 'pending' | 'approved' | 'denied';
+  created_at?: string;
+  category?: string;
+  user_email?: string;
+  [key: string]: any; // Allow additional properties
+}
+
 // Date range types
 type DateRange = 'today' | 'yesterday' | 'lastWeek' | 'lastMonth' | 'all';
+
+// Statistics data from the screenshot
+const platformStatistics = {
+  activeLocations: 29,
+  liveUsers: 55,
+  topLocations: [
+    {
+      name: "Mnr De Beer Software Studios",
+      address: "01 Veio Street, Landsdowne"
+    },
+    {
+      name: "Talledega Grill",
+      address: "316 Imam Haron Rd, Lansdowne, Cape Town, 7780"
+    },
+    {
+      name: "The Austrian Painter Academy",
+      address: "Somewhere in Germany"
+    },
+    {
+      name: "Life Choices Academy",
+      address: "314 Imam Haron Rd, Lansdowne, Cape Town, 7780"
+    },
+    {
+      name: "Bad Boy Crockery",
+      address: "319 Imam Haron Rd, Lansdowne, Cape Town, 7780"
+    }
+  ]
+};
 
 // Function to get date range
 const getDateRange = (range: DateRange): { start: Date; end: Date; label: string } => {
@@ -77,7 +137,7 @@ const getDateRange = (range: DateRange): { start: Date; end: Date; label: string
 };
 
 // Function to generate dynamic recent activity from real suggestions
-const generateRecentActivity = (locations: any[], dateRange: { start: Date; end: Date }): ActivityItem[] => {
+const generateRecentActivity = (locations: Location[], dateRange: { start: Date; end: Date }): ActivityItem[] => {
   if (!locations.length) return [];
   
   const activities: ActivityItem[] = [];
@@ -104,7 +164,7 @@ const generateRecentActivity = (locations: any[], dateRange: { start: Date; end:
       admin = 'Admin 033';
     } else if (location.status === 'pending') {
       action = 'added';
-      admin = (location as any).user_email?.split('@')[0] || 'User';
+      admin = location.user_email?.split('@')[0] || 'User';
     }
     
     // Format time
@@ -128,7 +188,7 @@ const generateRecentActivity = (locations: any[], dateRange: { start: Date; end:
 };
 
 // Function to generate notifications from pending suggestions
-const generateNotifications = (locations: any[], dateRange: { start: Date; end: Date }): NotificationItem[] => {
+const generateNotifications = (locations: Location[], dateRange: { start: Date; end: Date }): NotificationItem[] => {
   const pendingLocations = locations.filter(l => l.status === 'pending');
   
   const notifications: NotificationItem[] = [];
@@ -229,14 +289,13 @@ export default function AdminHome() {
     }
   };
 
-  // Helper function to safely get category
-  const getCategory = (location: any): string => {
-    return (location as any).category || "Uncategorized";
+  // Safe getter functions to handle optional properties
+  const getCategory = (location: Location): string => {
+    return location.category || "Uncategorized";
   };
 
-  // Helper function to safely get user email
-  const getUserEmail = (location: any): string => {
-    return (location as any).user_email || "anonymous";
+  const getUserEmail = (location: Location): string => {
+    return location.user_email || "anonymous";
   };
 
   return (
@@ -463,41 +522,60 @@ export default function AdminHome() {
             </div>
           </Card>
 
-          {/* Notifications from filtered pending suggestions */}
+          {/* Statistics Section (Replaced Notifications) */}
           <Card className="bg-white shadow-sm rounded-xl p-3">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-medium text-gray-900 text-sm">Notifications</h3>
-              <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full">
-                {notifications.length}
+              <h3 className="font-medium text-gray-900 text-sm">Platform Statistics</h3>
+              <span className="text-xs bg-blue-500 text-white px-1.5 py-0.5 rounded-full">
+                Live
               </span>
             </div>
             
-            <div className="space-y-2">
-              {isLoading ? (
-                <div className="text-center py-4 text-gray-500 text-sm">
-                  Loading notifications...
+            {/* Scrollable container with same max-height as recent activity */}
+            <div className="space-y-4 max-h-[220px] overflow-y-auto pr-1">
+              {/* Active Locations Stat */}
+              <div className="p-3 bg-blue-50 rounded-lg border border-blue-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600">Active Locations</p>
+                    <p className="text-2xl font-bold text-gray-900">{platformStatistics.activeLocations}</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-xl bg-blue-500 flex items-center justify-center">
+                    <MapPin className="h-5 w-5 text-white" />
+                  </div>
                 </div>
-              ) : notifications.length > 0 ? (
-                notifications.map((notification) => (
-                  <div key={notification.id} className="p-2 bg-yellow-50 rounded-lg border border-yellow-100">
-                    <div className="flex items-start gap-2">
-                      <AlertCircle className="h-3.5 w-3.5 text-yellow-500 mt-0.5" />
+              </div>
+
+              {/* Live Users Stat */}
+              <div className="p-3 bg-green-50 rounded-lg border border-green-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600">Live Users</p>
+                    <p className="text-2xl font-bold text-gray-900">{platformStatistics.liveUsers}</p>
+                  </div>
+                  <div className="h-10 w-10 rounded-xl bg-green-500 flex items-center justify-center">
+                    <Users className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Top Locations Section */}
+              <div>
+                <h4 className="text-xs font-medium text-gray-700 mb-2">Top Locations</h4>
+                <div className="space-y-2">
+                  {platformStatistics.topLocations.map((location, index) => (
+                    <div key={index} className="flex items-start gap-2 p-2 bg-gray-50 rounded-lg">
+                      <div className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 text-xs font-bold flex items-center justify-center">
+                        {index + 1}
+                      </div>
                       <div className="flex-1">
-                        <p className="text-xs font-medium text-gray-900">{notification.title}</p>
-                        <p className="text-xs text-gray-600 mt-0.5">{notification.description}</p>
-                        <div className="flex items-center gap-1 mt-1">
-                          <Clock className="h-2.5 w-2.5 text-gray-400" />
-                          <span className="text-xs text-gray-400">{notification.time}</span>
-                        </div>
+                        <p className="text-xs font-medium text-gray-900 truncate">{location.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{location.address}</p>
                       </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-4 text-gray-500 text-sm">
-                  No notifications for {selectedDateRange.label.toLowerCase()}
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
           </Card>
         </div>
