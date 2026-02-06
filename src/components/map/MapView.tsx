@@ -106,7 +106,7 @@ export function MapView({
         if (!mapContainer.current || map.current) return;
 
         const style = MAPTILER_API_KEY
-            ? `https://api.maptiler.com/maps/019c1e96-0cd8-7758-8b57-e13f87a1269d/style.json?key=${MAPTILER_API_KEY}`
+            ? `https://api.maptiler.com/maps/019c2dbf-3685-7ef2-9655-ad8c0b268d0e/style.json?key=${MAPTILER_API_KEY}`
             : 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
         map.current = new maplibregl.Map({
