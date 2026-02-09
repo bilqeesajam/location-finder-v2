@@ -9,13 +9,14 @@ export const getSafetyIncidents = async (lat, lon) => {
   
   if (!API_KEY) {
     console.warn("TomTom API Key is missing. Check your .env file.");
+    return { isSafe: true, error: "TomTom API Key is missing" };
   }
 
   // Define the area to check (approx 1km box)
   const offset = 0.01; 
   const bbox = `${lon - offset},${lat - offset},${lon + offset},${lat + offset}`;
   
-  const url = `https://api.tomtom.com/traffic/services/5/incidentDetails?key=${API_KEY}&bbox=${bbox}&fields={incidents{type,properties{events{description}}}}`;
+  const url = `https://api.tomtom.com/traffic/services/5/incidentDetails?key=${API_KEY}&bbox=${bbox}&fields={incidents{type,geometry,properties{events{description}}}}`;
 
   try {
     const response = await fetch(url);

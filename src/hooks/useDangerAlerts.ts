@@ -1,12 +1,11 @@
-﻿import { useEffect, useState } from "react";
-import { mockDangerZones, type DangerZone } from "@/data/mockDangerZones";
+import { useEffect, useState } from "react";
+import type { DangerZone } from "@/data/mockDangerZones";
 
 export type AlertStatus = "safe" | "warning" | "danger";
 export type RiskLevel = "safe" | "low" | "medium" | "high";
 
 const WARNING_BUFFER_METERS = 200;
 const LOW_BUFFER_METERS = 400;
-const TEST_ZONE_RADIUS_METERS = 120;
 
 function toRad(value: number) {
   return (value * Math.PI) / 180;
@@ -40,18 +39,7 @@ export function useDangerAlerts(
   useEffect(() => {
     if (!userLocation) return;
 
-    const zones: DangerZone[] = [
-      {
-        lat: userLocation.lat,
-        lng: userLocation.lng,
-        radius: TEST_ZONE_RADIUS_METERS,
-        title: "Test Danger Zone",
-        message: "You are inside a test zone centered on your live location.",
-        severity: "high",
-      },
-      ...mockDangerZones,
-      ...extraZones,
-    ];
+    const zones: DangerZone[] = [...extraZones];
 
     let nextStatus: AlertStatus = "safe";
     let nextZone: DangerZone | null = null;
@@ -136,3 +124,4 @@ export function useDangerAlerts(
     dismissRisk: () => setDismissedRiskLevel(riskLevel),
   };
 }
+

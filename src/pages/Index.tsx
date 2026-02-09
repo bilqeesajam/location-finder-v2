@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useDangerAlerts } from '@/hooks/useDangerAlerts';
 import { DangerAlertPopup } from '@/components/DangerAlertPopup';
 import { DangerSeverityPopup } from '@/components/DangerSeverityPopup';
-import { mockDangerZones } from '@/data/mockDangerZones';
+import { useTomtomDangerZones } from '@/hooks/useTomtomDangerZones';
 
 export default function Index() {
   const [isAddingLocation, setIsAddingLocation] = useState(false);
@@ -23,6 +23,8 @@ export default function Index() {
     ? { lat: myLocation.latitude, lng: myLocation.longitude }
     : undefined;
 
+  const { dangerZones } = useTomtomDangerZones(userLocation);
+
   const {
     alertStatus,
     alertZone,
@@ -32,7 +34,7 @@ export default function Index() {
     shouldShowRisk,
     dismiss,
     dismissRisk,
-  } = useDangerAlerts(userLocation);
+  } = useDangerAlerts(userLocation, dangerZones);
 
   const handleToggleAddLocation = useCallback(() => {
     if (!user) {
@@ -73,7 +75,7 @@ export default function Index() {
           onMapClick={handleMapClick}
           isAddingLocation={isAddingLocation}
           userLocation={userLocation}
-          dangerZones={mockDangerZones}
+          dangerZones={dangerZones}
         />
       </div>
 
