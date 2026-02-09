@@ -56,7 +56,6 @@ export function MapView({
                             onMapClick,
                             isAddingLocation,
                             className,
-                            userLocation,
                             dangerZones = [],
                         }: MapViewProps) {
     const mapContainer = useRef<HTMLDivElement>(null);
@@ -134,19 +133,7 @@ export function MapView({
     }, []);
 
     const dangerZonesGeoJson = useMemo(() => {
-        const zones: DangerZone[] = userLocation
-            ? [
-                {
-                    lat: userLocation.lat,
-                    lng: userLocation.lng,
-                    radius: 300,
-                    title: 'Live Test Zone',
-                    message: 'Live test zone centered on your location.',
-                    severity: 'high',
-                },
-                ...dangerZones,
-            ]
-            : dangerZones;
+        const zones: DangerZone[] = dangerZones;
 
         return {
             type: 'FeatureCollection' as const,
@@ -162,7 +149,7 @@ export function MapView({
                 },
             })),
         };
-    }, [userLocation, dangerZones]);
+    }, [dangerZones]);
 
     const dangerRoutesGeoJson = useMemo(() => ({
         type: 'FeatureCollection' as const,
@@ -340,7 +327,7 @@ export function MapView({
         });
     }, [liveLocations, isLoaded]);
 
-    // Add mock danger zones + routes
+    // Add danger zones + routes
     useEffect(() => {
         if (!map.current || !isLoaded) return;
 
