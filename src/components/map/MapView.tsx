@@ -5,6 +5,38 @@ import { Location } from '@/hooks/useLocations';
 import { LiveLocation } from '@/hooks/useLiveLocations';
 import { MapControls } from './MapControls';
 import { cn } from '@/lib/utils';
+import { mockDangerRoutes, type DangerZone } from '@/data/mockDangerZones';
+
+const DANGER_ZONE_SOURCE_ID = 'danger-zones';
+const DANGER_ROUTE_SOURCE_ID = 'danger-routes';
+const DANGER_ZONE_FILL_ID = 'danger-zone-fill';
+const DANGER_ZONE_OUTLINE_ID = 'danger-zone-outline';
+const DANGER_ROUTE_LINE_ID = 'danger-route-line';
+
+function toRad(value: number) {
+    return (value * Math.PI) / 180;
+}
+
+function squarePolygon(lng: number, lat: number, radiusMeters: number) {
+    const earthRadius = 6371000;
+    const latRad = toRad(lat);
+    const angularDistance = radiusMeters / earthRadius;
+    const deltaLat = angularDistance;
+    const deltaLng = angularDistance / Math.cos(latRad);
+
+    const latDeg = lat;
+    const lngDeg = lng;
+    const dLatDeg = (deltaLat * 180) / Math.PI;
+    const dLngDeg = (deltaLng * 180) / Math.PI;
+
+    return [
+        [lngDeg - dLngDeg, latDeg - dLatDeg],
+        [lngDeg + dLngDeg, latDeg - dLatDeg],
+        [lngDeg + dLngDeg, latDeg + dLatDeg],
+        [lngDeg - dLngDeg, latDeg + dLatDeg],
+        [lngDeg - dLngDeg, latDeg - dLatDeg],
+    ];
+}
 
 interface MapViewProps {
     locations: Location[];
@@ -12,6 +44,8 @@ interface MapViewProps {
     onMapClick?: (lng: number, lat: number) => void;
     isAddingLocation?: boolean;
     className?: string;
+    userLocation?: { lat: number; lng: number };
+    dangerZones?: DangerZone[];
 }
 
 const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY as string;
@@ -40,6 +74,7 @@ export function MapView({
     onMapClick,
     isAddingLocation,
     className,
+    dangerZones = [],
 }: MapViewProps) {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
@@ -55,16 +90,17 @@ export function MapView({
     const [selectedServices, setSelectedServices] = useState<string[]>([]);
     const [mapMoveTick, setMapMoveTick] = useState(0); 
     const [currentZoom, setCurrentZoom] = useState(2); // Track zoom for live markers
+    const [showDangerZones, setShowDangerZones] = useState(true);
 
     const matchesService = (loc: Location, service: string) => {
         const text = (loc.name + ' ' + (loc.description || '')).toLowerCase();
         const keywords: Record<string, string[]> = {
+            clinic: ['clinic', 'medical', 'health', 'doctor', 'hospital', 'er', 'emergency'],
+            library: ['library'],
+            shelter: ['shelter', 'homeless', 'safe house', 'refuge', 'refugee', 'crisis'],
             hospitals: ['hospital', 'clinic', 'medical', 'health', 'emergency'],
             police: ['police', 'precinct', 'station'],
-            library: ['library'],
-            restaurants: ['restaurant', 'cafe', 'café', 'diner', 'bistro', 'eatery'],
-            clinic: ['clinic'],
-            shelter: ['shelter'],
+            restaurants: ['restaurant', 'cafe', 'diner', 'bistro', 'eatery'],
             parks: ['park', 'garden'],
             roads: ['road', 'street', 'rd', 'st'],
         };
@@ -96,6 +132,39 @@ export function MapView({
 
     const handleClearFilters = useCallback(() => setSelectedServices([]), []);
 
+    const dangerZonesGeoJson = useMemo(() => {
+        const zones: DangerZone[] = dangerZones;
+
+        return {
+            type: 'FeatureCollection' as const,
+            features: zones.map((zone) => ({
+                type: 'Feature' as const,
+                properties: {
+                    title: zone.title,
+                    severity: zone.severity ?? 'high',
+                },
+                geometry: {
+                    type: 'Polygon' as const,
+                    coordinates: [squarePolygon(zone.lng, zone.lat, zone.radius)],
+                },
+            })),
+        };
+    }, [dangerZones]);
+
+    const dangerRoutesGeoJson = useMemo(() => ({
+        type: 'FeatureCollection' as const,
+        features: mockDangerRoutes.map((route) => ({
+            type: 'Feature' as const,
+            properties: {
+                id: route.id,
+            },
+            geometry: {
+                type: 'LineString' as const,
+                coordinates: route.coordinates,
+            },
+        })),
+    }), []);
+
     useEffect(() => {
         onMapClickRef.current = onMapClick;
         isAddingLocationRef.current = isAddingLocation;
@@ -105,7 +174,7 @@ export function MapView({
         if (!mapContainer.current || map.current) return;
 
         const style = MAPTILER_API_KEY
-            ? `https://api.maptiler.com/maps/019c2dbf-3685-7ef2-9655-ad8c0b268d0e/style.json?key=${MAPTILER_API_KEY}`
+            ? `https://api.maptiler.com/maps/019c1e96-0cd8-7758-8b57-e13f87a1269d/style.json?key=${MAPTILER_API_KEY}`
             : 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
         map.current = new maplibregl.Map({
@@ -114,6 +183,7 @@ export function MapView({
             center: [0, 20],
             zoom: 2,
             pitch: 45,
+            bearing: 0,
             maxPitch: 85,
         });
 
@@ -289,6 +359,105 @@ export function MapView({
         });
     }, [liveLocations, isLoaded, currentZoom]);
 
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+
+        const mapInstance = map.current;
+
+        if (!mapInstance.getSource(DANGER_ZONE_SOURCE_ID)) {
+            mapInstance.addSource(DANGER_ZONE_SOURCE_ID, {
+                type: 'geojson',
+                data: dangerZonesGeoJson,
+            });
+
+            mapInstance.addLayer({
+                id: DANGER_ZONE_FILL_ID,
+                type: 'fill',
+                source: DANGER_ZONE_SOURCE_ID,
+                paint: {
+                    'fill-color': [
+                        'match',
+                        ['get', 'severity'],
+                        'high',
+                        '#EF4444',
+                        'medium',
+                        '#F97316',
+                        'low',
+                        '#FACC15',
+                        '#EF4444',
+                    ],
+                    'fill-opacity': 1,
+                },
+                layout: {
+                    visibility: showDangerZones ? 'visible' : 'none',
+                },
+            });
+
+            mapInstance.addLayer({
+                id: DANGER_ZONE_OUTLINE_ID,
+                type: 'line',
+                source: DANGER_ZONE_SOURCE_ID,
+                paint: {
+                    'line-color': [
+                        'match',
+                        ['get', 'severity'],
+                        'high',
+                        '#EF4444',
+                        'medium',
+                        '#F97316',
+                        'low',
+                        '#FACC15',
+                        '#EF4444',
+                    ],
+                    'line-width': 2.5,
+                    'line-opacity': 1,
+                },
+                layout: {
+                    visibility: showDangerZones ? 'visible' : 'none',
+                },
+            });
+        } else {
+            const source = mapInstance.getSource(DANGER_ZONE_SOURCE_ID) as maplibregl.GeoJSONSource;
+            source.setData(dangerZonesGeoJson);
+        }
+
+        if (!mapInstance.getSource(DANGER_ROUTE_SOURCE_ID)) {
+            mapInstance.addSource(DANGER_ROUTE_SOURCE_ID, {
+                type: 'geojson',
+                data: dangerRoutesGeoJson,
+            });
+
+            mapInstance.addLayer({
+                id: DANGER_ROUTE_LINE_ID,
+                type: 'line',
+                source: DANGER_ROUTE_SOURCE_ID,
+                paint: {
+                    'line-color': '#B91C1C',
+                    'line-width': 5,
+                    'line-opacity': 1,
+                },
+                layout: {
+                    visibility: showDangerZones ? 'visible' : 'none',
+                },
+            });
+        }
+    }, [dangerZonesGeoJson, dangerRoutesGeoJson, isLoaded, showDangerZones]);
+
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+
+        const visibility = showDangerZones ? 'visible' : 'none';
+        if (map.current.getLayer(DANGER_ZONE_FILL_ID)) {
+            map.current.setLayoutProperty(DANGER_ZONE_FILL_ID, 'visibility', visibility);
+        }
+        if (map.current.getLayer(DANGER_ZONE_OUTLINE_ID)) {
+            map.current.setLayoutProperty(DANGER_ZONE_OUTLINE_ID, 'visibility', visibility);
+        }
+        if (map.current.getLayer(DANGER_ROUTE_LINE_ID)) {
+            map.current.setLayoutProperty(DANGER_ROUTE_LINE_ID, 'visibility', visibility);
+        }
+    }, [showDangerZones, isLoaded]);
+
     const handleSelectLocation = useCallback((loc: Location) => {
         if (!map.current) return;
         map.current.flyTo({ center: [loc.longitude, loc.latitude], zoom: 15, duration: 1800, essential: true });
@@ -320,6 +489,8 @@ export function MapView({
                 is3D={is3D}
                 onToggle3D={() => setIs3D((v) => !v)}
                 onResetView={() => map.current?.flyTo({ center: [0, 20], zoom: 2, pitch: 0 })}
+                showDangerZones={showDangerZones}
+                onToggleDangerZones={() => setShowDangerZones((prev) => !prev)}
                 locations={locations}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
@@ -331,7 +502,7 @@ export function MapView({
             />
             {!isLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80">
-                    <span className="text-sm text-muted-foreground">Loading map…</span>
+                    <span className="text-sm text-muted-foreground">Loading map...</span>
                 </div>
             )}
         </div>
