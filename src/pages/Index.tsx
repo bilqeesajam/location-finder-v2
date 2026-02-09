@@ -14,6 +14,7 @@ import { useTomtomDangerZones } from '@/hooks/useTomtomDangerZones';
 export default function Index() {
   const [isAddingLocation, setIsAddingLocation] = useState(false);
   const [clickedCoords, setClickedCoords] = useState<{ lng: number; lat: number } | null>(null);
+  const [showSafetyLegend, setShowSafetyLegend] = useState(true);
 
   const { user } = useAuth();
   const { approvedLocations } = useLocations();
@@ -79,11 +80,11 @@ export default function Index() {
         />
       </div>
 
-      {shouldShowRisk && riskZone && (
+      {showSafetyLegend && (
         <DangerSeverityPopup
-          level={riskLevel as 'low' | 'medium' | 'high'}
+          level={riskLevel}
           offsetBottom={shouldShow ? 110 : 16}
-          onDismiss={dismissRisk}
+          onDismiss={() => setShowSafetyLegend(false)}
         />
       )}
 

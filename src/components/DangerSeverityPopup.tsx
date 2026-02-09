@@ -2,7 +2,7 @@ import React from "react";
 import type { RiskLevel } from "@/hooks/useDangerAlerts";
 
 type DangerSeverityPopupProps = {
-  level: Exclude<RiskLevel, "safe">;
+  level: RiskLevel;
   offsetBottom?: number;
   onDismiss?: () => void;
 };
@@ -78,23 +78,40 @@ export function DangerSeverityPopup({
   onDismiss,
 }: DangerSeverityPopupProps) {
   return (
-    <div
-      role="alert"
-      aria-live="polite"
-      style={{
-        position: "absolute",
-        left: 16,
-        bottom: offsetBottom,
-        zIndex: 50,
-        maxWidth: 320,
-        borderRadius: 12,
-        padding: "14px 16px",
-        boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
-        background: "#fff",
-        border: "1px solid #e5e7eb",
-        color: "#111827",
-      }}
-    >
+    <>
+      <style>
+        {`
+          .danger-severity-popup {
+            position: fixed;
+            left: 50%;
+            bottom: var(--danger-severity-bottom, 16px);
+            transform: translateX(-50%);
+            z-index: 50;
+            max-width: min(320px, 90vw);
+          }
+
+          @media (min-width: 768px) {
+            .danger-severity-popup {
+              left: 16px;
+              transform: none;
+            }
+          }
+        `}
+      </style>
+      <div
+        role="alert"
+        aria-live="polite"
+        className="danger-severity-popup"
+        style={{
+          borderRadius: 12,
+          padding: "14px 16px",
+          boxShadow: "0 12px 30px rgba(0,0,0,0.25)",
+          background: "#fff",
+          border: "1px solid #e5e7eb",
+          color: "#111827",
+          ["--danger-severity-bottom" as string]: `${offsetBottom}px`,
+        }}
+      >
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
         <ShieldIcon />
         <div style={{ fontWeight: 700 }}>Safety Information</div>
@@ -163,6 +180,7 @@ export function DangerSeverityPopup({
           Dismiss
         </button>
       )}
-    </div>
+      </div>
+    </>
   );
 }
