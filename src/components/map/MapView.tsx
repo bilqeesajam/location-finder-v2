@@ -17,26 +17,25 @@ function toRad(value: number) {
     return (value * Math.PI) / 180;
 }
 
-function circlePolygon(lng: number, lat: number, radiusMeters: number, steps = 64) {
-    const coordinates: Array<[number, number]> = [];
+function squarePolygon(lng: number, lat: number, radiusMeters: number) {
     const earthRadius = 6371000;
-    const angularDistance = radiusMeters / earthRadius;
     const latRad = toRad(lat);
-    const lngRad = toRad(lng);
+    const angularDistance = radiusMeters / earthRadius;
+    const deltaLat = angularDistance;
+    const deltaLng = angularDistance / Math.cos(latRad);
 
-    for (let i = 0; i <= steps; i++) {
-        const bearing = (i / steps) * Math.PI * 2;
-        const sinLat = Math.sin(latRad) * Math.cos(angularDistance) + Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearing);
-        const newLat = Math.asin(sinLat);
-        const newLng = lngRad + Math.atan2(
-            Math.sin(bearing) * Math.sin(angularDistance) * Math.cos(latRad),
-            Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(newLat)
-        );
+    const latDeg = lat;
+    const lngDeg = lng;
+    const dLatDeg = (deltaLat * 180) / Math.PI;
+    const dLngDeg = (deltaLng * 180) / Math.PI;
 
-        coordinates.push([newLng * (180 / Math.PI), newLat * (180 / Math.PI)]);
-    }
-
-    return coordinates;
+    return [
+        [lngDeg - dLngDeg, latDeg - dLatDeg],
+        [lngDeg + dLngDeg, latDeg - dLatDeg],
+        [lngDeg + dLngDeg, latDeg + dLatDeg],
+        [lngDeg - dLngDeg, latDeg + dLatDeg],
+        [lngDeg - dLngDeg, latDeg - dLatDeg],
+    ];
 }
 
 interface MapViewProps {
@@ -140,7 +139,7 @@ export function MapView({
                 {
                     lat: userLocation.lat,
                     lng: userLocation.lng,
-                    radius: 140,
+                    radius: 300,
                     title: 'Live Test Zone',
                     message: 'Live test zone centered on your location.',
                     severity: 'high',
@@ -159,7 +158,7 @@ export function MapView({
                 },
                 geometry: {
                     type: 'Polygon' as const,
-                    coordinates: [circlePolygon(zone.lng, zone.lat, zone.radius)],
+                    coordinates: [squarePolygon(zone.lng, zone.lat, zone.radius)],
                 },
             })),
         };

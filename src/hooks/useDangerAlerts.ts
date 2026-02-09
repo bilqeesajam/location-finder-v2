@@ -6,7 +6,7 @@ export type RiskLevel = "safe" | "low" | "medium" | "high";
 
 const WARNING_BUFFER_METERS = 200;
 const LOW_BUFFER_METERS = 400;
-const TEST_ZONE_RADIUS_METERS = 120;
+const TEST_ZONE_RADIUS_METERS = 500;
 
 function toRad(value: number) {
   return (value * Math.PI) / 180;
