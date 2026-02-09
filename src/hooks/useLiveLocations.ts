@@ -14,6 +14,7 @@ export interface LiveLocation {
 export function useLiveLocations() {
   const [liveLocations, setLiveLocations] = useState<LiveLocation[]>([]);
   const [isSharing, setIsSharing] = useState(false);
+  const [localLocation, setLocalLocation] = useState<LiveLocation | null>(null);
   const { user } = useAuth();
   const watchIdRef = useRef<number | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
@@ -60,6 +61,15 @@ export function useLiveLocations() {
   // Update user's live location
   const updateMyLocation = useCallback(async (latitude: number, longitude: number) => {
     if (!user) return;
+
+    const optimistic = {
+      id: `local-${user.id}`,
+      user_id: user.id,
+      latitude,
+      longitude,
+      updated_at: new Date().toISOString(),
+    };
+    setLocalLocation(optimistic);
 
     const { error } = await supabase
       .from('live_locations')
@@ -136,6 +146,7 @@ export function useLiveLocations() {
     }
 
     setIsSharing(false);
+    setLocalLocation(null);
     toast.success('Stopped sharing your location');
   }, [user]);
 
@@ -150,7 +161,8 @@ export function useLiveLocations() {
 
   // Filter out current user's location
   const othersLocations = liveLocations.filter(l => l.user_id !== user?.id);
-  const myLocation = liveLocations.find(l => l.user_id === user?.id);
+  const dbMyLocation = liveLocations.find(l => l.user_id === user?.id);
+  const myLocation = dbMyLocation || localLocation;
 
   return {
     liveLocations,
