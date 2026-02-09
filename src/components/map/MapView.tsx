@@ -369,7 +369,7 @@ export function MapView({
                         '#FACC15',
                         '#EF4444',
                     ],
-                    'fill-opacity': 0.45,
+                    'fill-opacity': 1,
                 },
                 layout: {
                     visibility: showDangerZones ? 'visible' : 'none',
@@ -392,8 +392,8 @@ export function MapView({
                         '#FACC15',
                         '#EF4444',
                     ],
-                    'line-width': 2,
-                    'line-opacity': 0.9,
+                    'line-width': 2.5,
+                    'line-opacity': 1,
                 },
                 layout: {
                     visibility: showDangerZones ? 'visible' : 'none',
@@ -416,8 +416,8 @@ export function MapView({
                 source: DANGER_ROUTE_SOURCE_ID,
                 paint: {
                     'line-color': '#B91C1C',
-                    'line-width': 4,
-                    'line-opacity': 0.85,
+                    'line-width': 5,
+                    'line-opacity': 1,
                 },
                 layout: {
                     visibility: showDangerZones ? 'visible' : 'none',
