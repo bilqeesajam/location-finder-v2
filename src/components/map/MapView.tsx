@@ -15,6 +15,9 @@ interface MapViewProps {
 }
 
 const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY as string;
+const FLY_EVENT = 'findr:flyto';
+
+type FlyDetail = { lng: number; lat: number; label?: string; zoom?: number };
 
 export function MapView({
                             locations,
@@ -35,6 +38,49 @@ export function MapView({
     const [is3D, setIs3D] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedServices, setSelectedServices] = useState<string[]>([]);
+
+    const flyTo = useCallback(
+        (lng: number, lat: number, label?: string, zoom?: number) => {
+            if (!map.current) return;
+
+            map.current.flyTo({
+                center: [lng, lat],
+                zoom: zoom ?? 16,
+                duration: 1500,
+                essential: true,
+            });
+
+            if (label) {
+                setTimeout(() => {
+                    popupRef.current?.remove();
+                    popupRef.current = new maplibregl.Popup({ offset: 25 })
+                        .setLngLat([lng, lat])
+                        .setHTML(`
+              <div class="p-4 min-w-[220px]">
+                <h3 class="font-semibold text-lg">${label}</h3>
+                <p class="text-xs text-muted-foreground mt-1">
+                  ${lat.toFixed(5)}, ${lng.toFixed(5)}
+                </p>
+              </div>
+            `)
+                        .addTo(map.current!);
+                }, 500);
+            }
+        },
+        []
+    );
+
+    // Listen for sidebar click events
+    useEffect(() => {
+        const handler = (ev: Event) => {
+            const e = ev as CustomEvent<FlyDetail>;
+            if (!e.detail) return;
+            flyTo(e.detail.lng, e.detail.lat, e.detail.label, e.detail.zoom);
+        };
+
+        window.addEventListener(FLY_EVENT, handler as EventListener);
+        return () => window.removeEventListener(FLY_EVENT, handler as EventListener);
+    }, [flyTo]);
 
     const matchesService = (loc: Location, service: string) => {
         const text = (loc.name + ' ' + (loc.description || '')).toLowerCase();
@@ -129,11 +175,10 @@ export function MapView({
         map.current.on('load', () => {
             setIsLoaded(true);
 
-            // 3D buildings (if style supports openmaptiles)
             if (map.current?.getSource('openmaptiles')) {
                 const layers = map.current.getStyle().layers;
                 const labelLayerId = layers?.find(
-                    (l) => l.type === 'symbol' && l.layout?.['text-field']
+                    (l) => l.type === 'symbol' && (l.layout as any)?.['text-field']
                 )?.id;
 
                 if (!map.current.getLayer('3d-buildings')) {
@@ -174,7 +219,12 @@ export function MapView({
         map.current.getCanvas().style.cursor = isAddingLocation ? 'crosshair' : '';
     }, [isAddingLocation]);
 
-    // markers (your saved locations)
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+        map.current.easeTo({ pitch: is3D ? 45 : 0, duration: 700 });
+    }, [is3D, isLoaded]);
+
+    // MARKERS (saved locations)
     useEffect(() => {
         if (!map.current || !isLoaded) return;
 
@@ -192,19 +242,10 @@ export function MapView({
         </div>
       `;
 
+            // ✅ ONLY CHANGE
             el.onclick = (e) => {
                 e.stopPropagation();
-                popupRef.current?.remove();
-
-                popupRef.current = new maplibregl.Popup({ offset: 25 })
-                    .setLngLat([location.longitude, location.latitude])
-                    .setHTML(`
-            <div class="p-4 min-w-[200px]">
-              <h3 class="font-semibold text-lg">${location.name}</h3>
-              ${location.description ?? ''}
-            </div>
-          `)
-                    .addTo(map.current!);
+                flyTo(location.longitude, location.latitude, location.name, 16);
             };
 
             const marker = new maplibregl.Marker({ element: el })
@@ -213,9 +254,9 @@ export function MapView({
 
             markersRef.current.push(marker);
         });
-    }, [filteredLocations, isLoaded]);
+    }, [filteredLocations, isLoaded, flyTo]);
 
-    // live markers
+    // LIVE MARKERS
     useEffect(() => {
         if (!map.current || !isLoaded) return;
 
@@ -248,58 +289,22 @@ export function MapView({
         });
     }, [liveLocations, isLoaded]);
 
-    // from your DB locations (search dropdown “Saved location”)
-    const handleSelectLocation = useCallback((loc: Location) => {
-        if (!map.current) return;
+    const handleSelectLocation = useCallback(
+        (loc: Location) => {
+            flyTo(loc.longitude, loc.latitude, loc.name, 15);
+        },
+        [flyTo]
+    );
 
-        map.current.flyTo({
-            center: [loc.longitude, loc.latitude],
-            zoom: 15,
-            duration: 1800,
-            essential: true,
-        });
-
-        setTimeout(() => {
-            popupRef.current?.remove();
-            popupRef.current = new maplibregl.Popup({ offset: 25 })
-                .setLngLat([loc.longitude, loc.latitude])
-                .setHTML(`
-          <div class="p-4 min-w-[200px]">
-            <h3 class="font-semibold text-lg">${loc.name}</h3>
-            ${loc.description ?? ''}
-          </div>
-        `)
-                .addTo(map.current!);
-        }, 600);
-    }, []);
-
-    // from MapTiler geocoding (addresses + attractions)
-    const handleSelectGeocode = useCallback((lng: number, lat: number, label: string, zoom?: number) => {
-        if (!map.current) return;
-
-        map.current.flyTo({
-            center: [lng, lat],
-            zoom: zoom ?? 15,
-            duration: 1800,
-            essential: true,
-        });
-
-        setTimeout(() => {
-            popupRef.current?.remove();
-            popupRef.current = new maplibregl.Popup({ offset: 25 })
-                .setLngLat([lng, lat])
-                .setHTML(`
-          <div class="p-4 min-w-[220px]">
-            <h3 class="font-semibold text-lg">${label}</h3>
-            <p class="text-xs text-muted-foreground mt-1">${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
-          </div>
-        `)
-                .addTo(map.current!);
-        }, 600);
-    }, []);
+    const handleSelectGeocode = useCallback(
+        (lng: number, lat: number, label: string, zoom?: number) => {
+            flyTo(lng, lat, label, zoom ?? 15);
+        },
+        [flyTo]
+    );
 
     return (
-        <div className={cn('relative w-full h-full', className)}>
+        <div className={cn('fixed inset-0 w-screen h-screen', className)}>
             <div ref={mapContainer} className="absolute inset-0" />
 
             <MapControls
