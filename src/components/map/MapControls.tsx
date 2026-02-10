@@ -25,6 +25,7 @@ interface MapControlsProps {
     onServiceToggle: (service: string) => void;
 
     onClearFilters: () => void;
+    onSelectGeocode: (lng: number, lat: number, label: string, zoom?: number) => void;
 }
 
 export function MapControls({
@@ -70,6 +71,7 @@ export function MapControls({
         { key: "hospitals", label: "Hospitals" },
         { key: "police", label: "Police" },
         { key: "restaurants", label: "Restaurants" },
+        { key: "bus", label: "Bus" },
     ];
 
     return (

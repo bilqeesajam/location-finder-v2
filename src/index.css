@@ -248,3 +248,12 @@
 *:focus-visible {
   @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
 }
+
+/* MapLibre control icon positioning */
+.maplibregl-ctrl-icon {
+  display: inline-block;
+  width: 100%;
+  height: 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
