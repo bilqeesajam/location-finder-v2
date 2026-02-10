@@ -5,13 +5,26 @@ import { Location } from '@/hooks/useLocations';
 import { LiveLocation } from '@/hooks/useLiveLocations';
 import { MapControls } from './MapControls';
 import { cn } from '@/lib/utils';
-import { mockDangerRoutes, type DangerZone } from '@/data/mockDangerZones';
+import { getSafetyIncidents } from '@/services/tomtomService';
+import { DangerAlertPopup } from '@/components/DangerAlertPopup';
+import { DangerSeverityPopup } from '@/components/DangerSeverityPopup';
 
 const DANGER_ZONE_SOURCE_ID = 'danger-zones';
 const DANGER_ROUTE_SOURCE_ID = 'danger-routes';
 const DANGER_ZONE_FILL_ID = 'danger-zone-fill';
 const DANGER_ZONE_OUTLINE_ID = 'danger-zone-outline';
 const DANGER_ROUTE_LINE_ID = 'danger-route-line';
+
+type DangerZone = {
+    id: string;
+    title: string;
+    severity?: 'low' | 'medium' | 'high';
+    lat: number;
+    lng: number;
+    radius: number;
+};
+
+type RiskLevel = 'safe' | 'low' | 'medium' | 'high';
 
 function toRad(value: number) {
     return (value * Math.PI) / 180;
@@ -45,7 +58,6 @@ interface MapViewProps {
     isAddingLocation?: boolean;
     className?: string;
     userLocation?: { lat: number; lng: number };
-    dangerZones?: DangerZone[];
 }
 
 const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY as string;
@@ -74,7 +86,6 @@ export function MapView({
     onMapClick,
     isAddingLocation,
     className,
-    dangerZones = [],
 }: MapViewProps) {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<maplibregl.Map | null>(null);
@@ -91,6 +102,13 @@ export function MapView({
     const [mapMoveTick, setMapMoveTick] = useState(0); 
     const [currentZoom, setCurrentZoom] = useState(2); // Track zoom for live markers
     const [showDangerZones, setShowDangerZones] = useState(true);
+    const [tomtomZones, setTomtomZones] = useState<DangerZone[]>([]);
+    const [showDangerAlert, setShowDangerAlert] = useState(true);
+    const [showSeverityPopup, setShowSeverityPopup] = useState(true);
+    const [tomtomIncidentCount, setTomtomIncidentCount] = useState(0);
+    const [tomtomError, setTomtomError] = useState<string | null>(null);
+    const tomtomRequestIdRef = useRef(0);
+    const CLUSTER_DISTANCE_METERS = 300;
 
     const matchesService = (loc: Location, service: string) => {
         const text = (loc.name + ' ' + (loc.description || '')).toLowerCase();
@@ -133,7 +151,7 @@ export function MapView({
     const handleClearFilters = useCallback(() => setSelectedServices([]), []);
 
     const dangerZonesGeoJson = useMemo(() => {
-        const zones: DangerZone[] = dangerZones;
+        const zones: DangerZone[] = tomtomZones;
 
         return {
             type: 'FeatureCollection' as const,
@@ -149,21 +167,20 @@ export function MapView({
                 },
             })),
         };
-    }, [dangerZones]);
+    }, [tomtomZones]);
 
     const dangerRoutesGeoJson = useMemo(() => ({
         type: 'FeatureCollection' as const,
-        features: mockDangerRoutes.map((route) => ({
-            type: 'Feature' as const,
-            properties: {
-                id: route.id,
-            },
-            geometry: {
-                type: 'LineString' as const,
-                coordinates: route.coordinates,
-            },
-        })),
+        features: [] as GeoJSON.Feature<GeoJSON.LineString>[],
     }), []);
+
+    const riskLevel: RiskLevel = useMemo(() => {
+        const count = tomtomZones.length;
+        if (count >= 5) return 'high';
+        if (count >= 2) return 'medium';
+        if (count >= 1) return 'low';
+        return 'safe';
+    }, [tomtomZones.length]);
 
     useEffect(() => {
         onMapClickRef.current = onMapClick;
@@ -362,6 +379,117 @@ export function MapView({
     useEffect(() => {
         if (!map.current || !isLoaded) return;
 
+        const center = map.current.getCenter();
+        const requestId = tomtomRequestIdRef.current + 1;
+        tomtomRequestIdRef.current = requestId;
+
+        const timer = setTimeout(async () => {
+            const result = await getSafetyIncidents(center.lat, center.lng);
+            if (tomtomRequestIdRef.current !== requestId) return;
+
+            if (!result || result.error || !Array.isArray(result.data)) {
+                setTomtomZones([]);
+                setTomtomIncidentCount(result?.incidentCount ?? 0);
+                setTomtomError(result?.error ?? null);
+                return;
+            }
+
+            const incidents = result.data.map((incident: any, index: number) => {
+                const coords = incident?.geometry?.coordinates;
+                let lng = center.lng;
+                let lat = center.lat;
+
+                if (Array.isArray(coords)) {
+                    if (typeof coords[0] === 'number' && typeof coords[1] === 'number') {
+                        lng = coords[0];
+                        lat = coords[1];
+                    } else if (Array.isArray(coords[0]) && typeof coords[0][0] === 'number') {
+                        lng = coords[0][0];
+                        lat = coords[0][1];
+                    }
+                }
+
+                const title =
+                    incident?.properties?.events?.[0]?.description ||
+                    incident?.properties?.description ||
+                    'Incident';
+
+                return {
+                    id: incident?.id?.toString() ?? `tomtom-${index}`,
+                    title,
+                    lat,
+                    lng,
+                };
+            });
+
+            const toMeters = (a: number, b: number, latBase: number) => {
+                const dLat = (a - b) * 111320;
+                return Math.abs(dLat);
+            };
+
+            const distanceMeters = (aLat: number, aLng: number, bLat: number, bLng: number) => {
+                const dLat = (aLat - bLat) * 111320;
+                const dLng = (aLng - bLng) * (111320 * Math.cos((aLat * Math.PI) / 180));
+                return Math.sqrt(dLat * dLat + dLng * dLng);
+            };
+
+            const clusters: Array<{ lat: number; lng: number; titles: string[]; count: number }> = [];
+
+            incidents.forEach((incident) => {
+                let assigned = false;
+                for (const cluster of clusters) {
+                    if (distanceMeters(incident.lat, incident.lng, cluster.lat, cluster.lng) <= CLUSTER_DISTANCE_METERS) {
+                        const total = cluster.count + 1;
+                        cluster.lat = (cluster.lat * cluster.count + incident.lat) / total;
+                        cluster.lng = (cluster.lng * cluster.count + incident.lng) / total;
+                        cluster.count = total;
+                        cluster.titles.push(incident.title);
+                        assigned = true;
+                        break;
+                    }
+                }
+                if (!assigned) {
+                    clusters.push({
+                        lat: incident.lat,
+                        lng: incident.lng,
+                        count: 1,
+                        titles: [incident.title],
+                    });
+                }
+            });
+
+            const zones: DangerZone[] = clusters.map((cluster, index) => {
+                const severity: DangerZone['severity'] =
+                    cluster.count >= 5 ? 'high' : cluster.count >= 3 ? 'medium' : 'low';
+                const radius = Math.min(260, 140 + cluster.count * 20);
+                return {
+                    id: `cluster-${index}`,
+                    title: cluster.titles[0] ?? 'Incident',
+                    severity,
+                    lat: cluster.lat,
+                    lng: cluster.lng,
+                    radius,
+                };
+            });
+
+            setTomtomZones(zones);
+            setTomtomIncidentCount(result?.incidentCount ?? incidents.length);
+            setTomtomError(null);
+        }, 400);
+
+        return () => clearTimeout(timer);
+    }, [mapMoveTick, isLoaded]);
+
+    useEffect(() => {
+        if (tomtomZones.length > 0) {
+            setShowDangerAlert(true);
+            setShowSeverityPopup(true);
+        }
+    }, [tomtomZones.length]);
+
+    useEffect(() => {
+        if (!map.current || !isLoaded) return;
+
         const mapInstance = map.current;
 
         if (!mapInstance.getSource(DANGER_ZONE_SOURCE_ID)) {
@@ -386,7 +514,7 @@ export function MapView({
                         '#FACC15',
                         '#EF4444',
                     ],
-                    'fill-opacity': 1,
+                    'fill-opacity': 0.35,
                 },
                 layout: {
                     visibility: showDangerZones ? 'visible' : 'none',
@@ -410,7 +538,7 @@ export function MapView({
                         '#EF4444',
                     ],
                     'line-width': 2.5,
-                    'line-opacity': 1,
+                    'line-opacity': 0.35,
                 },
                 layout: {
                     visibility: showDangerZones ? 'visible' : 'none',
@@ -500,6 +628,51 @@ export function MapView({
                 onClearFilters={handleClearFilters}
                 onSelectGeocode={handleSelectGeocode}
             />
+            <div className="absolute left-4 top-4 z-20 rounded-lg bg-black/70 text-white text-xs px-3 py-2 space-y-1">
+                <div className="font-semibold">TomTom Debug</div>
+                <div>Incidents: {tomtomIncidentCount}</div>
+                <div>Zones: {tomtomZones.length}</div>
+                <div>Risk: {riskLevel}</div>
+                <div>Show Zones: {showDangerZones ? 'on' : 'off'}</div>
+                <div>API Key: {import.meta.env.VITE_TOMTOM_API_KEY ? 'set' : 'missing'}</div>
+                {tomtomError && <div className="text-red-200">Error: {tomtomError}</div>}
+                <div className="pt-1 flex gap-1">
+                    <button
+                        className="px-2 py-1 rounded bg-white/10 hover:bg-white/20"
+                        onClick={() => map.current?.flyTo({ center: [-73.9855, 40.758], zoom: 13 })}
+                    >
+                        NYC
+                    </button>
+                    <button
+                        className="px-2 py-1 rounded bg-white/10 hover:bg-white/20"
+                        onClick={() => map.current?.flyTo({ center: [-118.2437, 34.0522], zoom: 13 })}
+                    >
+                        LA
+                    </button>
+                    <button
+                        className="px-2 py-1 rounded bg-white/10 hover:bg-white/20"
+                        onClick={() => map.current?.flyTo({ center: [-0.1276, 51.5072], zoom: 13 })}
+                    >
+                        London
+                    </button>
+                </div>
+            </div>
+            {tomtomZones.length > 0 && showDangerAlert && (
+                <DangerAlertPopup
+                    status="danger"
+                    title="Danger Nearby"
+                    message={`${tomtomZones.length} incident${tomtomZones.length === 1 ? '' : 's'} reported near this area.`}
+                    onDismiss={() => setShowDangerAlert(false)}
+                    offsetBottom={16}
+                />
+            )}
+            {tomtomZones.length > 0 && riskLevel !== 'safe' && showSeverityPopup && (
+                <DangerSeverityPopup
+                    level={riskLevel}
+                    onDismiss={() => setShowSeverityPopup(false)}
+                    offsetBottom={88}
+                />
+            )}
             {!isLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80">
                     <span className="text-sm text-muted-foreground">Loading map...</span>

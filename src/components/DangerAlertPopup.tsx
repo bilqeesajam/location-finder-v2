@@ -1,5 +1,5 @@
 ﻿import React from "react";
-import type { AlertStatus } from "@/hooks/useDangerAlerts";
+type AlertStatus = "safe" | "warning" | "danger";
 
 type DangerAlertPopupProps = {
   status: Exclude<AlertStatus, "safe">;

@@ -1,5 +1,6 @@
 import React from "react";
-import type { RiskLevel } from "@/hooks/useDangerAlerts";
+
+type RiskLevel = "safe" | "low" | "medium" | "high";
 
 type DangerSeverityPopupProps = {
   level: RiskLevel;
