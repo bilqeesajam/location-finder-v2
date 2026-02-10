@@ -1,11 +1,10 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MapPin, X, ArrowLeft, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocations } from "@/hooks/useLocations";
 
 const ACCENT = '#009E61';
-const cn = (...classes) => classes.filter(Boolean).join(' ');
 
 const ProfilePage = () => {
   const navigate = useNavigate();
@@ -20,21 +19,38 @@ const ProfilePage = () => {
     email: "",
     password: "",
   });
+  const [profile, setProfile] = useState({
+    name: "",
+    email: "",
+    location: "",
+  });
+
+  // Initialize profile with user data
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        name: user?.user_metadata?.name || "",
+        email: user?.email || "",
+        location: user?.user_metadata?.location || "",
+      });
+    }
+  }, [user]);
 
   // Filter approved locations
   const approvedLocations = userLocations.filter(loc => loc.status === 'approved');
 
   const handleEditClick = () => {
+    // Pre-fill form with current profile data
+    setFormData({
+      name: profile.name,
+      email: profile.email,
+      password: "", // Always keep password empty initially
+    });
     setIsEditModalOpen(true);
   };
 
   const handleCloseEditModal = () => {
     setIsEditModalOpen(false);
-    setFormData({
-      name: "",
-      email: "",
-      password: "",
-    });
   };
 
   const handleSavedLocationsClick = () => {
@@ -56,7 +72,17 @@ const ProfilePage = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     console.log("Updating profile with:", formData);
-    // TODO: Implement profile update with backend
+    
+    // Update the profile state with new data
+    setProfile({
+      name: formData.name,
+      email: formData.email,
+      location: profile.location, // Keep existing location
+    });
+    
+    // TODO: Call backend API here to persist changes to database
+    // Example: await updateUserProfile(formData);
+    
     handleCloseEditModal();
     alert("Profile updated successfully!");
   };
@@ -272,7 +298,7 @@ const ProfilePage = () => {
             <div className="relative">
               <div className="w-28 h-28 border-4 border-white bg-gray-300 rounded-full flex items-center justify-center shadow-lg">
                 <span className="text-gray-800 text-2xl font-semibold">
-                  {user?.user_metadata?.name
+                  {profile.name
                     ?.split(" ")
                     .map((n) => n[0])
                     .join("")
@@ -285,12 +311,12 @@ const ProfilePage = () => {
 
           <div className="text-center mb-6">
             <h1 className="text-xl font-bold text-gray-900 mb-1">
-              {user?.user_metadata?.name || "User"}
+              {profile.name || "User"}
             </h1>
-            <p className="text-sm text-gray-600 mb-3">{user?.email || ""}</p>
+            <p className="text-sm text-gray-600 mb-3">{profile.email || ""}</p>
             <div className="flex items-center justify-center gap-1.5 text-gray-600">
               <MapPin className="w-4 h-4 text-blue-500" />
-              <span className="text-sm">{user?.user_metadata?.location || "Location not set"}</span>
+              <span className="text-sm">{profile.location || "Location not set"}</span>
             </div>
           </div>
 
@@ -313,44 +339,39 @@ const ProfilePage = () => {
             <h2 className="text-base font-semibold text-gray-900">
               Your Locations
             </h2>
- <p className="text-xs text-gray-900 mt-0.5">
-  {userLocations.length} locations you've submitted with descriptions
-</p>
-</div>
+            <p className="text-xs text-gray-900 mt-0.5">
+              {userLocations.length} locations you've submitted with descriptions
+            </p>
+          </div>
 
-
-
-      {/* Full Locations List */}
-      <div className="p-4 bg-gray-100 rounded-lg border border-gray-400 max-w-md mx-auto">
-        <div className="divide-y divide-gray-900">
-          {userLocations.map((location) => (
-            <div
-              key={location.id}
-              className="flex items-start justify-between py-3"
-            >
-              <div className="flex-1">
-                <h4 className="text-sm font-medium text-gray-900">
-                  {location.name}
-                </h4>
-                {location.description && (
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    {location.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${location.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                    {location.status}
-                  </span>
+          {/* Full Locations List */}
+          <div className="p-4 bg-gray-100 rounded-lg border border-gray-400 max-w-md mx-auto mb-8">
+            <div className="divide-y divide-gray-900">
+              {userLocations.map((location) => (
+                <div
+                  key={location.id}
+                  className="flex items-start justify-between py-3"
+                >
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-gray-900">
+                      {location.name}
+                    </h4>
+                    {location.description && (
+                      <p className="text-xs text-gray-600 mt-0.5">
+                        {location.description}
+                      </p>
+                    )}
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${location.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {location.status}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
-    : (
-    </div>
-  )
-</div>
+          </div>
+
           <div className="mt-6 flex justify-center">
             <button
               onClick={handleLogout}
@@ -361,6 +382,8 @@ const ProfilePage = () => {
             </button>
           </div>
         </div>
+      </div>
+    </div>
   );
 };
 
