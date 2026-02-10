@@ -72,7 +72,7 @@ export function Sidebar({
                 variant="ghost"
                 size="icon"
                 className={cn(
-                    'fixed top-4 right-4 z-50 md:hidden',
+                    'fixed top-16 right-5 z-50 md:hidden',
                     'rounded-full border border-white/10',
                     'backdrop-blur-xl shadow-lg'
                 )}
