@@ -20,7 +20,7 @@ const App = () => {
     // Simulate app loading (3-5 seconds)
     const timer = setTimeout(() => {
       setIsLoading(false);
-    }, 4000); // 4 seconds
+    }, 9000); // 9 seconds
 
     return () => clearTimeout(timer);
   }, []);
@@ -30,6 +30,7 @@ const App = () => {
   }
 
   return (
+    <div className="h-screen w-full overflow-hidden flex flex-col">
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
@@ -46,6 +47,7 @@ const App = () => {
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>
+    </div>
   );
 };
 

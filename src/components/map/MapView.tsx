@@ -301,11 +301,11 @@ export function MapView({
                 onSelectLocation={handleSelectLocation}
             />
 
-            {!isLoaded && (
+            {/* {!isLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center bg-background/80">
                     <span className="text-sm text-muted-foreground">Loading map…</span>
                 </div>
-            )}
+            )} */}
         </div>
     );
 }

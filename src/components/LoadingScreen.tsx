@@ -52,50 +52,51 @@ const LoadingScreen: React.FC<LoadingScreenProps> = ({ onLoadingComplete }) => {
 
   const visiblePathsCount = Math.floor((progress / 100) * totalPaths);
 
-  return (
-    <div className="fixed inset-0 bg-white flex items-center justify-center z-50 overflow-hidden">
-      <div className="relative w-full h-full flex items-center justify-center">
-        
-        {/* Logo Layer */}
-        <div 
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ transform: 'translateY(-56.7px)' }}
+return (
+  <div className="fixed inset-0 bg-white flex items-center justify-center z-50 overflow-hidden">
+    {/* This wrapper keeps the logo and SVG locked together */}
+    <div className="relative w-[90%] max-w-[750px] aspect-[198/170] flex items-center justify-center">
+      
+      {/* Logo Layer - Restored to your original vertical offset ratio */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center"
+        style={{ transform: 'translateY(-7.5%)' }} // Percentages keep it relative to the image size, not the screen
+      >
+        <img 
+          src="/logos/app-logo.png" 
+          alt="Logo" 
+          className="w-full h-auto object-contain opacity-95"
+        />
+      </div>
+      
+      {/* SVG Layer - Restored to your original alignment ratio */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        style={{ transform: 'translateX(-1.5%) translateY(2.5%)' }} // Percentages fix the "drift"
+      >
+        <svg 
+          viewBox="0 0 198 170"
+          fill="none" 
+          xmlns="http://www.w3.org/2000/svg"
+          className="w-full h-auto opacity-90"
         >
-          <img 
-            src="/logos/app-logo.png" 
-            alt="Logo" 
-            className="w-[750px] h-auto object-contain opacity-95"
-          />
-        </div>
-        
-        {/* SVG Layer: Shifted 0.3cm Left */}
-        <div 
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
-          style={{ transform: 'translateX(-11.34px) translateY(18.9px)' }}
-        >
-          <svg 
-            viewBox="0 0 198 170"
-            fill="none" 
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-[750px] h-auto opacity-90"
-          >
-            <g className="transition-all duration-75">
-              {PATH_DATA.slice(0, visiblePathsCount).map((path, index) => (
-                <path 
-                  key={index} 
-                  d={path} 
-                  stroke="black" 
-                  strokeWidth="0.82" 
-                  strokeLinecap="butt" 
-                  strokeLinejoin="inherit"
-                />
-              ))}
-            </g>
-          </svg>
-        </div>
+          <g className="transition-all duration-75">
+            {PATH_DATA.slice(0, visiblePathsCount).map((path, index) => (
+              <path 
+                key={index} 
+                d={path} 
+                stroke="black" 
+                strokeWidth="0.82" 
+                strokeLinecap="butt" 
+                strokeLinejoin="inherit"
+              />
+            ))}
+          </g>
+        </svg>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default LoadingScreen;
