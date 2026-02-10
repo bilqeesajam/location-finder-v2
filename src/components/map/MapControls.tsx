@@ -15,6 +15,8 @@ interface MapControlsProps {
     onToggle3D: () => void;
     onResetView: () => void;
     className?: string;
+    showDangerZones?: boolean;
+    onToggleDangerZones?: () => void;
 
     locations: Location[];
     searchQuery: string;
@@ -25,6 +27,7 @@ interface MapControlsProps {
     onServiceToggle: (service: string) => void;
 
     onClearFilters: () => void;
+    onSelectGeocode?: (lng: number, lat: number, label: string, zoom?: number) => void;
 }
 
 export function MapControls({
@@ -32,6 +35,8 @@ export function MapControls({
                                 onToggle3D,
                                 onResetView,
                                 className,
+                                showDangerZones,
+                                onToggleDangerZones,
                                 locations,
                                 searchQuery,
                                 onSearchChange,
