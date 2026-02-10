@@ -15,6 +15,8 @@ interface MapControlsProps {
     onToggle3D: () => void;
     onResetView: () => void;
     className?: string;
+    showDangerZones?: boolean;
+    onToggleDangerZones?: () => void;
 
     locations: Location[];
     searchQuery: string;
@@ -25,6 +27,7 @@ interface MapControlsProps {
     onServiceToggle: (service: string) => void;
 
     onClearFilters: () => void;
+    onSelectGeocode?: (lng: number, lat: number, label: string, zoom?: number) => void;
 }
 
 export function MapControls({
@@ -32,6 +35,8 @@ export function MapControls({
                                 onToggle3D,
                                 onResetView,
                                 className,
+                                showDangerZones,
+                                onToggleDangerZones,
                                 locations,
                                 searchQuery,
                                 onSearchChange,
@@ -171,6 +176,23 @@ export function MapControls({
                         className="bg-[#15292F] text-white border border-white/10 shadow-xl"
                     >
                         <div className="flex flex-col gap-3 min-w-[220px]">
+                            {onToggleDangerZones && typeof showDangerZones === "boolean" && (
+                                <div className="flex items-center justify-between gap-3">
+                                    <div className="text-sm font-medium text-white">Danger zones</div>
+                                    <button
+                                        onClick={onToggleDangerZones}
+                                        className={cn(
+                                            "px-2 py-1 rounded-md text-xs border border-white/10",
+                                            showDangerZones
+                                                ? "bg-[#B91C1C] text-white"
+                                                : "bg-white/10 text-white/70 hover:bg-white/15"
+                                        )}
+                                    >
+                                        {showDangerZones ? "On" : "Off"}
+                                    </button>
+                                </div>
+                            )}
+
                             <div className="flex items-center justify-between gap-3">
                                 <div className="text-sm font-medium text-white">Services</div>
 
