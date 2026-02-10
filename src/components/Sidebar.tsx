@@ -201,6 +201,14 @@ export function Sidebar({
                         </div>
                     </div>
 
+                    <Link to="/profile" className="col-span-2">
+            <div className="col-span-2">
+              <Button className="w-full bg-gradient-primary hover:opacity-90">
+                Profile
+              </Button>
+            </div>
+           </Link>
+
                     {/* Actions */}
                     {user && (
                         <div className="space-y-2">
