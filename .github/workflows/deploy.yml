@@ -16,11 +16,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
       
       - name: Validate project
         run: bun scripts/validate.cjs
-        env:
-          BUN_VERSION: 'latest'
         
       - name: Check for Node.js backend
         id: check-backend
