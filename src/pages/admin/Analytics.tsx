@@ -1158,7 +1158,7 @@ export default function AnalyticsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-100 p-4 md:p-6">
+      <div className="h-screen bg-gray-100 p-4 md:p-6">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Clock className="h-12 w-12 text-gray-400 animate-pulse mx-auto mb-4" />
