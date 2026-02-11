@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { cache, cacheKeys, cacheTTL } from '@/lib/cache';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
@@ -21,6 +22,17 @@ export function useLocations() {
   const { user, isAdmin } = useAuth();
 
   const fetchLocations = useCallback(async () => {
+    const cacheKey = cacheKeys.allLocations();
+    
+    // Check cache first
+    const cachedLocations = cache.get<Location[]>(cacheKey);
+    if (cachedLocations) {
+      console.log('Cache hit for all locations');
+      setLocations(cachedLocations);
+      setIsLoading(false);
+      return;
+    }
+
     setIsLoading(true);
     
     let query = supabase
@@ -50,7 +62,10 @@ export function useLocations() {
       toast.error('Failed to load locations');
       setLocations([]);
     } else {
-      setLocations(data as Location[] || []);
+      const locationData = data as Location[] || [];
+      setLocations(locationData);
+      // Cache the locations for 5 minutes
+      cache.set(cacheKey, locationData, cacheTTL.MEDIUM);
     }
     
     setIsLoading(false);
@@ -89,10 +104,12 @@ export function useLocations() {
       return { error };
     }
 
-    toast.success('Location submitted for approval');
+    // Invalidate cache and refetch
+    cache.deleteByPattern('locations:.*');
     await fetchLocations();
     return { data };
   }, [user, fetchLocations]);
+
 
   const updateLocationStatus = useCallback(async (
     id: string,
@@ -114,6 +131,8 @@ export function useLocations() {
     }
 
     toast.success(`Location ${status}`);
+    // Invalidate cache and refetch
+    cache.deleteByPattern('locations:.*');
     await fetchLocations();
     return { error: null };
   }, [isAdmin, fetchLocations]);
@@ -135,6 +154,8 @@ export function useLocations() {
     }
 
     toast.success('Location deleted');
+    // Invalidate cache and refetch
+    cache.deleteByPattern('locations:.*');
     await fetchLocations();
     return { error: null };
   }, [isAdmin, fetchLocations]);

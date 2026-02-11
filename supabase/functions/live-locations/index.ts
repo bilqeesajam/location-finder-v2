@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  getCacheValue,
+  setCacheValue,
+  deleteCacheByPattern,
+  cacheKeys,
+} from "../lib/redis.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -51,6 +57,18 @@ serve(async (req) => {
 
     // Handle GET requests - fetch all live locations
     if (req.method === 'GET') {
+      // Try to get from cache first
+      const cacheKey = cacheKeys.allLiveLocations();
+      const cachedData = await getCacheValue(cacheKey);
+      
+      if (cachedData) {
+        console.log('Cache hit for all live locations');
+        return new Response(
+          JSON.stringify({ data: JSON.parse(cachedData) }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       // Fetch live locations
       const { data: liveLocData, error: liveLocError } = await supabase
         .from('live_locations')
@@ -82,6 +100,9 @@ serve(async (req) => {
         ...loc,
         profile: profileMap.get(loc.user_id) || null,
       }));
+
+      // Cache live locations for 2 minutes (these change more frequently)
+      await setCacheValue(cacheKey, JSON.stringify(formatted), 120);
 
       return new Response(
         JSON.stringify({ data: formatted }),
@@ -135,6 +156,9 @@ serve(async (req) => {
             );
           }
 
+          // Invalidate live locations cache
+          await deleteCacheByPattern('live_locations:*');
+
           console.log(`Live location updated for user ${userId}`);
           return new Response(
             JSON.stringify({ data }),
@@ -155,6 +179,9 @@ serve(async (req) => {
               { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
+
+          // Invalidate live locations cache
+          await deleteCacheByPattern('live_locations:*');
 
           console.log(`Live location stopped for user ${userId}`);
           return new Response(

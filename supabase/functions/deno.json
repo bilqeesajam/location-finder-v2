@@ -1,0 +1,9 @@
+{
+  "imports": {
+    "https://": "https://"
+  },
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "target": "ES2020"
+  }
+}

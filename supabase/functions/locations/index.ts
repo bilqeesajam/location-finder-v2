@@ -1,5 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  getCacheValue,
+  setCacheValue,
+  deleteCacheByPattern,
+  cacheKeys,
+} from "../lib/redis.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -75,7 +81,19 @@ serve(async (req) => {
       const id = url.searchParams.get('id');
 
       if (id) {
-        // Get single location
+        // Try to get single location from cache first
+        const cacheKey = cacheKeys.locationById(id);
+        const cachedData = await getCacheValue(cacheKey);
+        
+        if (cachedData) {
+          console.log(`Cache hit for location ${id}`);
+          return new Response(
+            JSON.stringify({ data: JSON.parse(cachedData) }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Get single location from database
         const { data, error } = await supabase
           .from('locations')
           .select('*')
@@ -90,8 +108,23 @@ serve(async (req) => {
           );
         }
 
+        // Cache the location data for 1 hour
+        await setCacheValue(cacheKey, JSON.stringify(data), 3600);
+
         return new Response(
           JSON.stringify({ data }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Try to get all locations from cache first
+      const allCacheKey = cacheKeys.allLocations();
+      const cachedAllData = await getCacheValue(allCacheKey);
+      
+      if (cachedAllData) {
+        console.log('Cache hit for all locations');
+        return new Response(
+          JSON.stringify({ data: JSON.parse(cachedAllData) }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -109,6 +142,9 @@ serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+
+      // Cache all locations for 5 minutes (changes more frequently)
+      await setCacheValue(allCacheKey, JSON.stringify(data), 300);
 
       return new Response(
         JSON.stringify({ data }),
@@ -161,6 +197,9 @@ serve(async (req) => {
             );
           }
 
+          // Invalidate locations cache
+          await deleteCacheByPattern('locations:*');
+
           console.log(`Location created: ${data.id} by user ${userId}`);
           return new Response(
             JSON.stringify({ data, message: 'Location submitted for approval' }),
@@ -207,6 +246,9 @@ serve(async (req) => {
             );
           }
 
+          // Invalidate locations cache
+          await deleteCacheByPattern('locations:*');
+
           console.log(`Location ${id} status updated to ${status} by admin ${userId}`);
           return new Response(
             JSON.stringify({ data, message: `Location ${status}` }),
@@ -250,6 +292,9 @@ serve(async (req) => {
               { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             );
           }
+
+          // Invalidate locations cache
+          await deleteCacheByPattern('locations:*');
 
           console.log(`Location ${id} deleted by admin ${userId}`);
           return new Response(

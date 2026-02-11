@@ -1,4 +1,5 @@
 import { callEdgeFunction } from './baseApi';
+import { cache, cacheKeys, cacheTTL } from '@/lib/cache';
 import type {
   ApiResponse,
   Location,
@@ -10,7 +11,7 @@ import { validateCreateLocation } from '../types';
 
 /**
  * Locations API Service
- * Handles all location-related API calls through Edge Functions
+ * Handles all location-related API calls through Edge Functions with caching
  */
 export const locationsApi = {
   /**
@@ -19,6 +20,8 @@ export const locationsApi = {
   async getAll(): Promise<ApiResponse<Location[]>> {
     return callEdgeFunction<Location[]>('locations', {
       method: 'GET',
+      cache: true,
+      cacheTtl: cacheTTL.MEDIUM, // 5 minutes
     });
   },
 
@@ -29,6 +32,8 @@ export const locationsApi = {
     return callEdgeFunction<Location>('locations', {
       method: 'GET',
       params: { id },
+      cache: true,
+      cacheTtl: cacheTTL.LONG, // 1 hour
     });
   },
 
@@ -45,38 +50,62 @@ export const locationsApi = {
       };
     }
 
-    return callEdgeFunction<Location>('locations', {
+    const result = await callEdgeFunction<Location>('locations', {
       method: 'POST',
       body: {
         action: 'create',
         ...data,
       },
+      cache: false, // Don't cache POST requests
     });
+
+    // Invalidate location caches on successful creation
+    if (result.success) {
+      cache.deleteByPattern('locations:.*');
+    }
+
+    return result;
   },
 
   /**
    * Update location status (admin only)
    */
   async updateStatus(data: UpdateLocationStatusRequest): Promise<ApiResponse<Location>> {
-    return callEdgeFunction<Location>('locations', {
+    const result = await callEdgeFunction<Location>('locations', {
       method: 'POST',
       body: {
         action: 'updateStatus',
         ...data,
       },
+      cache: false, // Don't cache POST requests
     });
+
+    // Invalidate location caches on successful update
+    if (result.success) {
+      cache.deleteByPattern('locations:.*');
+    }
+
+    return result;
   },
 
   /**
    * Delete a location (admin only)
    */
   async delete(data: DeleteLocationRequest): Promise<ApiResponse<void>> {
-    return callEdgeFunction<void>('locations', {
+    const result = await callEdgeFunction<void>('locations', {
       method: 'POST',
       body: {
         action: 'delete',
         ...data,
       },
+      cache: false, // Don't cache POST requests
     });
+
+    // Invalidate location caches on successful delete
+    if (result.success) {
+      cache.deleteByPattern('locations:.*');
+    }
+
+    return result;
   },
 };

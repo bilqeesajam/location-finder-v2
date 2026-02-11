@@ -1,4 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import {
+  getCacheValue,
+  setCacheValue,
+  cacheKeys,
+} from "../lib/redis.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,6 +17,19 @@ serve(async (req) => {
   }
 
   try {
+    // Try to get from cache first
+    const cachedKey = await getCacheValue('maptiler:key');
+    if (cachedKey) {
+      console.log('Using cached MapTiler key');
+      return new Response(
+        JSON.stringify({ key: cachedKey }),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
     const maptilerKey = Deno.env.get('MAPTILER_API_KEY');
     
     if (!maptilerKey) {
@@ -24,6 +42,9 @@ serve(async (req) => {
         }
       );
     }
+
+    // Cache the key for 24 hours
+    await setCacheValue('maptiler:key', maptilerKey, 86400);
 
     return new Response(
       JSON.stringify({ key: maptilerKey }),

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { cache, cacheTTL } from '@/lib/cache';
 import type { ApiResponse } from '../types';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -23,7 +24,15 @@ export async function getAuthHeaders(): Promise<HeadersInit> {
 }
 
 /**
- * Call a Supabase Edge Function
+ * Generate cache key for edge function call
+ */
+function generateCacheKey(functionName: string, params?: Record<string, string>): string {
+  const paramStr = params ? JSON.stringify(params) : '';
+  return `${functionName}:${paramStr}`;
+}
+
+/**
+ * Call a Supabase Edge Function with caching support
  */
 export async function callEdgeFunction<T>(
   functionName: string,
@@ -31,9 +40,24 @@ export async function callEdgeFunction<T>(
     method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
     body?: unknown;
     params?: Record<string, string>;
+    cache?: boolean; // Enable caching for this call
+    cacheTtl?: number; // Custom TTL in milliseconds
   } = {}
 ): Promise<ApiResponse<T>> {
-  const { method = 'POST', body, params } = options;
+  const { method = 'POST', body, params, cache: enableCache = true, cacheTtl = cacheTTL.MEDIUM } = options;
+
+  // Only cache GET requests
+  const shouldCache = enableCache && method === 'GET';
+  const cacheKey = generateCacheKey(functionName, params);
+
+  // Check cache first
+  if (shouldCache) {
+    const cachedData = cache.get<ApiResponse<T>>(cacheKey);
+    if (cachedData) {
+      console.log(`Cache hit for ${functionName}`);
+      return cachedData;
+    }
+  }
 
   try {
     const headers = await getAuthHeaders();
@@ -53,17 +77,25 @@ export async function callEdgeFunction<T>(
     const data = await response.json();
 
     if (!response.ok) {
-      return {
+      const result: ApiResponse<T> = {
         success: false,
         error: data.error || `Request failed with status ${response.status}`,
       };
+      return result;
     }
 
-    return {
+    const result: ApiResponse<T> = {
       success: true,
       data: data.data ?? data,
       message: data.message,
     };
+
+    // Cache successful GET responses
+    if (shouldCache && result.success) {
+      cache.set(cacheKey, result, cacheTtl);
+    }
+
+    return result;
   } catch (error) {
     console.error(`Edge function ${functionName} error:`, error);
     return {

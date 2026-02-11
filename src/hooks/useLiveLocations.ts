@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import { cache, cacheKeys, cacheTTL } from '@/lib/cache';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
 
@@ -18,8 +19,18 @@ export function useLiveLocations() {
   const watchIdRef = useRef<number | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
-  // Fetch live locations directly from database
+  // Fetch live locations directly from database with caching
   const fetchLiveLocations = useCallback(async () => {
+    const cacheKey = cacheKeys.allLiveLocations();
+    
+    // Check cache first
+    const cachedLocations = cache.get<LiveLocation[]>(cacheKey);
+    if (cachedLocations) {
+      console.log('Cache hit for live locations');
+      setLiveLocations(cachedLocations);
+      return;
+    }
+
     const { data, error } = await supabase
       .from('live_locations')
       .select('*');
@@ -27,7 +38,10 @@ export function useLiveLocations() {
     if (error) {
       console.error('Error fetching live locations:', error);
     } else {
-      setLiveLocations(data as LiveLocation[] || []);
+      const locationData = data as LiveLocation[] || [];
+      setLiveLocations(locationData);
+      // Cache live locations for 30 seconds (real-time data)
+      cache.set(cacheKey, locationData, cacheTTL.VERY_SHORT);
     }
   }, []);
 
@@ -45,6 +59,8 @@ export function useLiveLocations() {
           table: 'live_locations',
         },
         () => {
+          // Invalidate cache on realtime updates
+          cache.deleteByPattern('live_locations:.*');
           fetchLiveLocations();
         }
       )
@@ -74,6 +90,9 @@ export function useLiveLocations() {
 
     if (error) {
       console.error('Error updating location:', error);
+    } else {
+      // Invalidate cache after update
+      cache.deleteByPattern('live_locations:.*');
     }
   }, [user]);
 
