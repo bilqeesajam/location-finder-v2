@@ -136,9 +136,11 @@ export function Sidebar({
     return window.innerWidth >= 768;
   });
 
+  // ✅ don't force-open on desktop resize (respects user collapsing)
   React.useEffect(() => {
     const onResize = () => {
-      if (window.innerWidth >= 768) setOpen(true);
+      // Only auto-close when going to mobile; don't auto-open on desktop
+      if (window.innerWidth < 768) setOpen(false);
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
@@ -283,12 +285,16 @@ export function Sidebar({
 
   return (
     <>
-      {/* Mobile toggle */}
+      {/* ✅ Toggle button:
+          - Mobile: always visible (open/close)
+          - Desktop: visible ONLY when sidebar is collapsed (so you can re-open)
+      */}
       <button
         className={cn(
-          "fixed left-4 top-4 z-50 md:hidden",
+          "fixed left-4 top-4 z-50",
           "h-11 w-11 rounded-full border backdrop-blur-xl shadow-lg",
-          "grid place-items-center",
+          "grid place-items-center transition hover:scale-[1.02] active:scale-[0.98]",
+          open ? "md:hidden" : "md:grid",
         )}
         style={{
           background: `${BG}cc`,
@@ -323,7 +329,8 @@ export function Sidebar({
           "left-4 top-4",
           "flex flex-col gap-4",
           "transition-transform duration-300 ease-out",
-          open ? "translate-x-0" : "-translate-x-[110%] md:translate-x-0",
+          // ✅ collapses on desktop too
+          open ? "translate-x-0" : "-translate-x-[110%]",
         )}
         style={{
           width: "clamp(280px, 28vw, 360px)",
@@ -333,7 +340,7 @@ export function Sidebar({
         {/* TOP: Suggested Places */}
         <GlassCard className="flex flex-col min-h-0">
           <div className="px-5 pt-5 pb-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div className="relative h-10 w-10 rounded-2xl overflow-hidden">
                   <div
@@ -353,6 +360,21 @@ export function Sidebar({
                   </div>
                 </div>
               </div>
+
+              {/* ✅ Collapse button on top of suggested card */}
+              <button
+                className={cn(
+                  "hidden md:grid",
+                  "h-10 w-10 rounded-2xl border place-items-center",
+                  "transition hover:bg-white/5 active:scale-[0.98]",
+                )}
+                style={{ borderColor: "rgba(255,255,255,0.10)" }}
+                onClick={() => setOpen(false)}
+                aria-label="Collapse sidebar"
+                title="Collapse"
+              >
+                <X className="h-5 w-5 text-white" />
+              </button>
             </div>
           </div>
 
@@ -461,8 +483,7 @@ export function Sidebar({
                 active={mode === "transit"}
                 onClick={() => setMode("transit")}
               >
-                <Bus className="h-5 w-5" />{" "}
-                {/* 👈 CHANGE BUS ICON SIZE HERE (e.g. h-6 w-6) */}
+                <Bus className="h-5 w-5" />
               </ModeBtn>
             </div>
           </div>
@@ -520,9 +541,7 @@ export function Sidebar({
           <div className="px-4 pt-4 pb-4 min-h-0">
             <div
               className="overflow-y-auto pr-1 scrollbar-hide"
-              style={{
-                maxHeight: "75vh", // 👈 CHANGE ROUTES/DESTINATION BLOCK SIZE HERE (e.g. 60vh, 80vh, 600px)
-              }}
+              style={{ maxHeight: "75vh" }}
             >
               {!fromPlace || !toPlace ? (
                 <div className="text-xs text-white/55">
