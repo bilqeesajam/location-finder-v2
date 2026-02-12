@@ -10,15 +10,9 @@ const ProfilePage = () => {
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
   const { userLocations } = useLocations();
-  
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
   const [isSavedLocationsModalOpen, setIsSavedLocationsModalOpen] = useState(false);
   const [selectedLocationId, setSelectedLocationId] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
   const [profile, setProfile] = useState({
     name: "",
     email: "",
@@ -39,52 +33,12 @@ const ProfilePage = () => {
   // Filter approved locations
   const approvedLocations = userLocations.filter(loc => loc.status === 'approved');
 
-  const handleEditClick = () => {
-    // Pre-fill form with current profile data
-    setFormData({
-      name: profile.name,
-      email: profile.email,
-      password: "", // Always keep password empty initially
-    });
-    setIsEditModalOpen(true);
-  };
-
-  const handleCloseEditModal = () => {
-    setIsEditModalOpen(false);
-  };
-
   const handleSavedLocationsClick = () => {
     setIsSavedLocationsModalOpen(true);
   };
 
   const handleCloseSavedLocationsModal = () => {
     setIsSavedLocationsModalOpen(false);
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log("Updating profile with:", formData);
-    
-    // Update the profile state with new data
-    setProfile({
-      name: formData.name,
-      email: formData.email,
-      location: profile.location, // Keep existing location
-    });
-    
-    // TODO: Call backend API here to persist changes to database
-    // Example: await updateUserProfile(formData);
-    
-    handleCloseEditModal();
-    alert("Profile updated successfully!");
   };
 
   const handleSelectLocation = (locationId) => {
@@ -102,94 +56,21 @@ const ProfilePage = () => {
     }
   };
 
+  // Get initials from email (first 2 characters before @)
+
+  // here is to change the initials 
+  // emailName.slice(0, 2).toUpperCase();
+  
+  const getEmailInitials = () => {
+    if (profile.email) {
+      const emailName = profile.email.split('@')[0];
+      return emailName.slice(0, 2).toUpperCase();
+    }
+    return "?";
+  };
+
   return (
     <div className="min-h-screen bg-white">
-      {/* Edit Profile Modal */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b">
-              <h2 className="text-lg font-semibold text-gray-900">
-                Edit Profile
-              </h2>
-              <button
-                onClick={handleCloseEditModal}
-                className="p-1 hover:bg-gray-100 rounded-full transition"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-4">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#009E61] focus:border-transparent text-gray-900 placeholder-gray-500"
-                    placeholder="Enter your name"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#009E61] focus:border-transparent text-gray-900 placeholder-gray-500"
-                    placeholder="Enter your email"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    name="password"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#009E61] focus:border-transparent text-gray-900 placeholder-gray-500"
-                    placeholder="Enter new password (leave blank to keep current)"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Leave password field empty if you don't want to change it
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={handleCloseEditModal}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition focus:outline-none"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-[#009E61] text-white rounded-md hover:bg-[#008c55] transition focus:outline-none"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Saved Locations Modal - Shows only approved locations */}
       {isSavedLocationsModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -262,6 +143,8 @@ const ProfilePage = () => {
         </div>
       )}
 
+
+   {/* This the Back to Map button */}
       <div className="relative w-full">
         <div className="bg-[#009E61] h-40">
           <div className="absolute top-4 left-4">
@@ -272,7 +155,7 @@ const ProfilePage = () => {
               <ArrowLeft className="w-4 h-4" />
             </button>
           </div>
-          
+
           <div className="flex items-center justify-center pt-6">
             <span className="text-white text-2xl font-bold italic">Findr</span>
           </div>
@@ -298,21 +181,13 @@ const ProfilePage = () => {
             <div className="relative">
               <div className="w-28 h-28 border-4 border-white bg-gray-300 rounded-full flex items-center justify-center shadow-lg">
                 <span className="text-gray-800 text-2xl font-semibold">
-                  {profile.name
-                    ?.split(" ")
-                    .map((n) => n[0])
-                    .join("")
-                    .toUpperCase()
-                    .slice(0, 2) || "?"}
+                  {getEmailInitials()}
                 </span>
               </div>
             </div>
           </div>
 
           <div className="text-center mb-6">
-            <h1 className="text-xl font-bold text-gray-900 mb-1">
-              {profile.name || "User"}
-            </h1>
             <p className="text-sm text-gray-600 mb-3">{profile.email || ""}</p>
             <div className="flex items-center justify-center gap-1.5 text-gray-600">
               <MapPin className="w-4 h-4 text-blue-500" />
@@ -320,14 +195,8 @@ const ProfilePage = () => {
             </div>
           </div>
 
-          <div className="flex justify-center gap-3 mb-8">
+          <div className="flex justify-center mb-8">
             <button
-              onClick={handleEditClick}
-              className="px-4 py-1.5 text-base bg-[#009E61] text-white rounded-md hover:bg-[#008c55] transition focus:outline-none"
-            >
-              Edit profile
-            </button>
-            <button 
               onClick={handleSavedLocationsClick}
               className="px-4 py-1.5 text-base bg-[#009E61] text-white rounded-md hover:bg-[#008c55] transition focus:outline-none"
             >
