@@ -21,6 +21,15 @@ import {
 import { cn } from "@/lib/utils";
 import { Location } from "@/hooks/useLocations";
 
+interface GeocodeResult {
+    id: string;
+    type: 'location' | 'geocode';
+    longitude: number;
+    latitude: number;
+    name: string;
+    description?: string;
+}
+
 interface MapControlsProps {
   is3D: boolean;
   onToggle3D: () => void;
@@ -29,10 +38,10 @@ interface MapControlsProps {
   showDangerZones?: boolean;
   onToggleDangerZones?: () => void;
 
-  locations: Location[];
-  searchQuery: string;
-  onSearchChange: (q: string) => void;
-  onSelectLocation: (loc: Location) => void;
+    locations: Location[];
+    searchQuery: string;
+    onSearchChange: (q: string) => void;
+    onSelectLocation: (loc: Location) => void;
 
   selectedServices: string[];
   onServiceToggle: (service: string) => void;
@@ -47,38 +56,105 @@ interface MapControlsProps {
 }
 
 export function MapControls({
-  is3D,
-  onToggle3D,
-  onResetView,
-  className,
-  showDangerZones,
-  onToggleDangerZones,
-  locations,
-  searchQuery,
-  onSearchChange,
-  onSelectLocation,
-  selectedServices,
-  onServiceToggle,
-  onClearFilters,
-}: MapControlsProps) {
-  const [isLocked, setIsLocked] = React.useState(false);
-  const scrollRef = React.useRef<HTMLDivElement>(null);
+                                is3D,
+                                onToggle3D,
+                                onResetView,
+                                className,
+                                locations,
+                                searchQuery,
+                                onSearchChange,
+                                onSelectLocation,
+                                onSelectGeocode,
+                                selectedServices,
+                                onServiceToggle,
+                                onClearFilters,
+            }: MapControlsProps) {
+    const scrollRef = React.useRef<HTMLDivElement>(null);
+    const [isLocked, setIsLocked] = React.useState(false);
+    const [geocodeResults, setGeocodeResults] = React.useState<GeocodeResult[]>([]);
+    const [isLoadingGeocode, setIsLoadingGeocode] = React.useState(false);
+    const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY as string;
 
-  const results = React.useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q || isLocked) return [];
-    return locations.filter(
-      (l) =>
-        l.name.toLowerCase().includes(q) ||
-        (l.description || "").toLowerCase().includes(q),
-    );
-  }, [locations, searchQuery, isLocked]);
+    // Fetch geocoding results from MapTiler
+    const fetchGeocodeResults = React.useCallback(async (query: string) => {
+        if (!query.trim() || !MAPTILER_API_KEY) return;
 
-  const handlePickLocation = (loc: Location) => {
-    onSearchChange(loc.name);
-    setIsLocked(true);
-    onSelectLocation(loc);
-  };
+        setIsLoadingGeocode(true);
+        try {
+            const response = await fetch(
+                `https://api.maptiler.com/geocoding/${encodeURIComponent(query)}.json?key=${MAPTILER_API_KEY}&limit=5`
+            );
+            const data = await response.json();
+
+            if (data.features) {
+                const results = data.features.map((feature: any) => ({
+                    id: feature.id,
+                    type: 'geocode' as const,
+                    longitude: feature.geometry.coordinates[0],
+                    latitude: feature.geometry.coordinates[1],
+                    name: feature.place_name || feature.text,
+                    description: feature.place_name?.split(',').slice(1).join(',').trim(),
+                }));
+                setGeocodeResults(results);
+            }
+        } catch (error) {
+            console.error('Geocoding error:', error);
+            setGeocodeResults([]);
+        } finally {
+            setIsLoadingGeocode(false);
+        }
+    }, [MAPTILER_API_KEY]);
+
+    // Combine saved locations and geocode results
+    const results = React.useMemo(() => {
+        const q = searchQuery.trim().toLowerCase();
+        if (!q || isLocked) return [];
+
+        const locationResults: GeocodeResult[] = locations
+            .filter(
+                (l) =>
+                    l.name.toLowerCase().includes(q) ||
+                    (l.description || "").toLowerCase().includes(q)
+            )
+            .map((l) => ({
+                id: l.id,
+                type: 'location' as const,
+                longitude: l.longitude,
+                latitude: l.latitude,
+                name: l.name,
+                description: l.description,
+            }));
+
+        return [...locationResults, ...geocodeResults].slice(0, 6);
+    }, [locations, searchQuery, isLocked, geocodeResults]);
+
+    // Trigger geocoding when search query changes
+    React.useEffect(() => {
+        const query = searchQuery.trim();
+        if (query && !isLocked) {
+            const timer = setTimeout(() => {
+                fetchGeocodeResults(query);
+            }, 300);
+            return () => clearTimeout(timer);
+        } else {
+            setGeocodeResults([]);
+        }
+    }, [searchQuery, isLocked, fetchGeocodeResults])
+
+    const handlePickLocation = (result: GeocodeResult) => {
+        if (result.type === 'location') {
+            const location = locations.find((l) => l.id === result.id);
+            if (location) {
+                onSearchChange(result.name);
+                setIsLocked(true);
+                onSelectLocation(location);
+            }
+        } else if (result.type === 'geocode' && onSelectGeocode) {
+            onSearchChange(result.name);
+            setIsLocked(true);
+            onSelectGeocode(result.longitude, result.latitude, result.name);
+        }
+    };
 
   const handleUnlock = () => {
     setIsLocked(false);
@@ -165,31 +241,36 @@ export function MapControls({
               </button>
             )}
 
-            {searchQuery.trim() && !isLocked && (
-              <div className="absolute left-0 right-0 mt-2 bg-popover rounded-xl shadow-lg overflow-hidden">
-                {results.length === 0 ? (
-                  <div className="p-3 text-sm text-muted-foreground">
-                    No results
-                  </div>
-                ) : (
-                  results.slice(0, 6).map((r) => (
-                    <button
-                      key={r.id}
-                      onClick={() => handlePickLocation(r)}
-                      className="w-full text-left px-4 py-3 hover:bg-accent/40"
-                    >
-                      <div className="font-semibold">{r.name}</div>
-                      {r.description && (
-                        <div className="text-xs text-muted-foreground truncate">
-                          {r.description}
+                    {searchQuery.trim() && !isLocked && (
+                        <div className="absolute left-0 right-0 mt-2 bg-popover rounded-xl shadow-lg overflow-hidden">
+                            {results.length === 0 ? (
+                                <div className="p-3 text-sm text-muted-foreground">
+                                    {isLoadingGeocode ? "Searching..." : "No results"}
+                                </div>
+                            ) : (
+                                results.map((r) => (
+                                    <button
+                                        key={`${r.type}-${r.id}`}
+                                        onClick={() => handlePickLocation(r)}
+                                        className="w-full text-left px-4 py-3 hover:bg-accent/40"
+                                    >
+                                        <div className="font-semibold">{r.name}</div>
+                                        {r.description && (
+                                            <div className="text-xs text-muted-foreground truncate">
+                                                {r.description}
+                                            </div>
+                                        )}
+                                        {r.type === 'geocode' && (
+                                            <div className="text-xs text-muted-foreground/60 mt-1">
+                                                📍 Location
+                                            </div>
+                                        )}
+                                    </button>
+                                ))
+                            )}
                         </div>
-                      )}
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
+                    )}
+                </div>
 
           {/* RESTORED ORIGINAL FILTER BUTTON */}
           <Popover>
