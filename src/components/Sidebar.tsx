@@ -129,6 +129,7 @@ export function Sidebar({
   const [toQuery, setToQuery] = React.useState("");
   const [fromPlace, setFromPlace] = React.useState<SuggestedPlace | null>(null);
   const [toPlace, setToPlace] = React.useState<SuggestedPlace | null>(null);
+  const directionsRef = React.useRef<HTMLDivElement>(null);
 
   // Collapsible: open on desktop by default
   const [open, setOpen] = React.useState<boolean>(() => {
@@ -144,6 +145,23 @@ export function Sidebar({
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // Listen for direction button clicks
+  React.useEffect(() => {
+    const handleShowDirections = () => {
+      setOpen(true);
+      // Scroll to directions after sidebar opens
+      setTimeout(() => {
+        directionsRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      }, 100);
+    };
+    window.addEventListener("findr:show-directions", handleShowDirections);
+    return () =>
+      window.removeEventListener("findr:show-directions", handleShowDirections);
   }, []);
 
   // DB locations (saved)
@@ -467,125 +485,119 @@ export function Sidebar({
         </GlassCard>
 
         {/* BOTTOM: Directions */}
-        <GlassCard className="flex flex-col min-h-0">
-          <div className="px-4 pt-4">
-            <div className="flex items-center gap-2">
-              <ModeBtn
-                active={mode === "drive"}
-                onClick={() => setMode("drive")}
-              >
-                <Car className="h-5 w-5" />
-              </ModeBtn>
-              <ModeBtn active={mode === "walk"} onClick={() => setMode("walk")}>
-                <PersonStanding className="h-5 w-5" />
-              </ModeBtn>
-              <ModeBtn
-                active={mode === "transit"}
-                onClick={() => setMode("transit")}
-              >
-                <Bus className="h-5 w-5" />
-              </ModeBtn>
-            </div>
-          </div>
-
-          <div className="px-4 pt-3">
-            <div className="space-y-2">
-              <AutocompleteRow
-                icon={<Search className="h-4 w-4 text-white/55" />}
-                placeholder="Choose a starting point..."
-                value={fromQuery}
-                onChange={(v) => {
-                  setFromQuery(v);
-                  setFromPlace(null);
-                }}
-                options={fromMatches}
-                onPick={(p) => {
-                  setFromPlace(p);
-                  setFromQuery(p.name);
-                  flyToPlace(p);
-                }}
-              />
-
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <AutocompleteRow
-                    icon={<MapPin className="h-4 w-4 text-red-400/90" />}
-                    placeholder="Choose a destination..."
-                    value={toQuery}
-                    onChange={(v) => {
-                      setToQuery(v);
-                      setToPlace(null);
-                    }}
-                    options={toMatches}
-                    onPick={(p) => {
-                      setToPlace(p);
-                      setToQuery(p.name);
-                      flyToPlace(p);
-                    }}
-                  />
-                </div>
-
-                <button
-                  className="h-[42px] w-[42px] rounded-2xl border grid place-items-center transition hover:bg-white/5"
-                  style={{ borderColor: "rgba(255,255,255,0.10)" }}
-                  onClick={swap}
-                  title="Swap"
-                >
-                  <ArrowUpDown className="h-4 w-4 text-white/70" />
-                </button>
+        <GlassCard ref={directionsRef} className="flex flex-col min-h-0">
+          {/* Transport Mode Buttons */}
+          <div
+            className="px-4 pt-4 pb-3 border-b"
+            style={{ borderColor: "rgba(255,255,255,0.08)" }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 flex-1">
+                <TransportModeButton
+                  active={mode === "drive"}
+                  onClick={() => setMode("drive")}
+                  icon={<Car className="h-5 w-5" />}
+                />
+                <TransportModeButton
+                  active={mode === "walk"}
+                  onClick={() => setMode("walk")}
+                  icon={<PersonStanding className="h-5 w-5" />}
+                />
+                <TransportModeButton
+                  active={mode === "transit"}
+                  onClick={() => setMode("transit")}
+                  icon={<Bus className="h-5 w-5" />}
+                />
               </div>
             </div>
           </div>
 
-          {/* ✅ BIG ROUTES / DESTINATION BLOCK */}
-          <div className="px-4 pt-4 pb-4 min-h-0">
-            <div
-              className="overflow-y-auto pr-1 scrollbar-hide"
-              style={{ maxHeight: "75vh" }}
-            >
-              {!fromPlace || !toPlace ? (
-                <div className="text-xs text-white/55">
-                  Pick a <span className="text-white">From</span> and{" "}
-                  <span className="text-white">To</span> location to see travel
-                  time.
-                </div>
-              ) : loadingRoutes ? (
-                <div className="text-xs text-white/55">Calculating route…</div>
-              ) : routeError ? (
-                <div className="text-xs text-red-300">{routeError}</div>
-              ) : (
-                <>
-                  <div className="text-[11px] text-white/55 mb-2">
-                    Fastest Route
-                  </div>
-                  {fastest ? (
-                    <RouteCard item={fastest} accent={ACCENT} />
-                  ) : null}
+          {/* Input Fields */}
+          <div className="px-4 pt-4 pb-3">
+            <div className="flex gap-2">
+              {/* Swap Button */}
+              <button
+                onClick={swap}
+                className="h-[44px] w-[44px] shrink-0 rounded-xl border grid place-items-center transition hover:bg-white/5"
+                style={{ borderColor: "rgba(255,255,255,0.12)" }}
+                title="Swap locations"
+              >
+                <ArrowUpDown className="h-4 w-4 text-white/70" />
+              </button>
 
-                  <div className="text-[11px] text-white/55 mt-4 mb-2">
-                    Alternative Routes
+              {/* Input Fields Column */}
+              <div className="flex-1 space-y-2">
+                {/* Starting Point */}
+                <DirectionInputRow
+                  icon={<Search className="h-4 w-4 text-white/60" />}
+                  placeholder="Choose starting point, or click on the map..."
+                  value={fromQuery}
+                  onChange={(v) => {
+                    setFromQuery(v);
+                    setFromPlace(null);
+                  }}
+                  options={fromMatches}
+                  onPick={(p) => {
+                    setFromPlace(p);
+                    setFromQuery(p.name);
+                    flyToPlace(p);
+                  }}
+                />
+
+                {/* Destination */}
+                <DirectionInputRow
+                  icon={<MapPin className="h-4 w-4 text-white/60" />}
+                  placeholder="Choose destination..."
+                  value={toQuery}
+                  onChange={(v) => {
+                    setToQuery(v);
+                    setToPlace(null);
+                  }}
+                  options={toMatches}
+                  onPick={(p) => {
+                    setToPlace(p);
+                    setToQuery(p.name);
+                    flyToPlace(p);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Routes Display */}
+          {(fromPlace || toPlace) && (
+            <div className="px-4 pb-4 min-h-0">
+              <div
+                className="overflow-y-auto pr-1 scrollbar-hide space-y-3"
+                style={{ maxHeight: "40vh" }}
+              >
+                {!fromPlace || !toPlace ? (
+                  <div className="text-xs text-white/50 px-2">
+                    Select both locations to calculate route
                   </div>
-                  <div className="space-y-2">
+                ) : loadingRoutes ? (
+                  <div className="text-xs text-white/50 px-2">
+                    Calculating route…
+                  </div>
+                ) : routeError ? (
+                  <div className="text-xs text-red-300 px-2">{routeError}</div>
+                ) : (
+                  <>
+                    {fastest && <RouteCard item={fastest} accent={ACCENT} />}
                     {alternatives.map((r) => (
                       <RouteCard key={r.id} item={r} accent={ACCENT} />
                     ))}
-                    {alternatives.length === 0 && (
-                      <div className="text-xs text-white/55">
-                        No alternatives found.
+
+                    {mode === "transit" && (
+                      <div className="text-[10px] text-white/40 px-2 mt-2">
+                        Transit times are estimates without real-time data
                       </div>
                     )}
-                  </div>
-
-                  {mode === "transit" && (
-                    <div className="text-[11px] text-white/45 mt-3">
-                      Bus time is an estimate (no timetables). Real transit
-                      needs GTFS/OTP/Google Routes.
-                    </div>
-                  )}
-                </>
-              )}
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </GlassCard>
       </aside>
     </>
@@ -594,15 +606,16 @@ export function Sidebar({
 
 /* ---------- UI pieces ---------- */
 
-function GlassCard({
-  className,
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
+const GlassCard = React.forwardRef<
+  HTMLDivElement,
+  {
+    className?: string;
+    children: React.ReactNode;
+  }
+>(({ className, children }, ref) => {
   return (
     <div
+      ref={ref}
       className={cn(
         "rounded-[28px] border shadow-[0_30px_80px_rgba(0,0,0,0.38)] backdrop-blur-xl overflow-hidden",
         className,
@@ -613,6 +626,109 @@ function GlassCard({
       }}
     >
       {children}
+    </div>
+  );
+});
+
+GlassCard.displayName = "GlassCard";
+
+function TransportModeButton({
+  active,
+  onClick,
+  icon,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "h-11 px-4 rounded-xl flex items-center justify-center transition-all",
+        active
+          ? "bg-white/10 text-white"
+          : "text-white/60 hover:text-white/90 hover:bg-white/5",
+      )}
+      style={{
+        borderBottom: active ? `2px solid ${ACCENT}` : "2px solid transparent",
+      }}
+    >
+      {icon}
+    </button>
+  );
+}
+
+function DirectionInputRow({
+  icon,
+  placeholder,
+  value,
+  onChange,
+  options,
+  onPick,
+}: {
+  icon: React.ReactNode;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+  options: SuggestedPlace[];
+  onPick: (p: SuggestedPlace) => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+
+  return (
+    <div className="relative">
+      <div
+        className="h-[44px] rounded-xl border px-3 flex items-center gap-3 bg-black/10"
+        style={{
+          borderColor: "rgba(255,255,255,0.12)",
+        }}
+      >
+        <div className="shrink-0 text-white/60">{icon}</div>
+        <input
+          className="w-full bg-transparent outline-none text-sm text-white placeholder:text-white/40"
+          placeholder={placeholder}
+          value={value}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 140)}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
+        />
+      </div>
+
+      {/* Dropdown */}
+      {open && options.length > 0 && (
+        <div
+          className="absolute left-0 right-0 mt-2 rounded-xl border overflow-hidden z-50 shadow-xl"
+          style={{
+            borderColor: "rgba(255,255,255,0.12)",
+            background: `${BG}f8`,
+          }}
+        >
+          <div className="max-h-[300px] overflow-y-auto">
+            {options.map((p) => (
+              <button
+                key={p.id}
+                className="w-full text-left px-3 py-2.5 text-sm text-white/90 hover:bg-white/8 transition-colors"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onPick(p);
+                  setOpen(false);
+                }}
+              >
+                <div className="font-medium truncate">{p.name}</div>
+                {p.category && (
+                  <div className="text-xs text-white/50 truncate mt-0.5">
+                    {p.category}
+                  </div>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -654,27 +770,24 @@ function RouteCard({ item, accent }: { item: RouteItem; accent: string }) {
 
   return (
     <div
-      className="rounded-2xl border p-3"
+      className="rounded-xl border p-3 bg-black/10"
       style={{
-        borderColor: "rgba(255,255,255,0.10)",
-        background: "rgba(255,255,255,0.04)",
+        borderColor: "rgba(255,255,255,0.12)",
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm text-white font-medium truncate">
-            {item.title}
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm text-white font-medium">{item.title}</div>
           {item.subtitle && (
-            <div className="text-xs text-white/55 mt-0.5">{item.subtitle}</div>
+            <div className="text-xs text-white/50 mt-0.5">{item.subtitle}</div>
           )}
         </div>
 
         <div className="text-right shrink-0">
-          <div className="text-sm font-semibold" style={{ color }}>
+          <div className="text-base font-bold" style={{ color }}>
             {item.timeMin} min
           </div>
-          <div className="text-xs text-white/55">{item.distanceKm} km</div>
+          <div className="text-xs text-white/50">{item.distanceKm} km</div>
         </div>
       </div>
     </div>

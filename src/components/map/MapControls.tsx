@@ -153,17 +153,59 @@ export function MapControls({
               }}
               placeholder="Search"
               readOnly={isLocked}
-              className="h-12 pl-12 pr-4 rounded-[20px] bg-[#0F2A2E]/90 text-white placeholder:text-[13px] placeholder-font-medium placeholder:text-slate-300 border-none shadow-lg backdrop-blur-md focus-visible:ring-0"
+              className="h-12 pl-12 pr-12 rounded-[20px] bg-[#0F2A2E]/90 text-white placeholder:text-[13px] placeholder-font-medium placeholder:text-slate-300 border-none shadow-lg backdrop-blur-md focus-visible:ring-0"
             />
 
             {isLocked && (
               <button
                 onClick={handleUnlock}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-white/80 hover:text-white"
+                className="absolute right-12 top-1/2 -translate-y-1/2 text-xs text-white/80 hover:text-white"
               >
                 Clear
               </button>
             )}
+
+            <button
+              className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center transition-all hover:scale-110"
+              onClick={() => {
+                window.dispatchEvent(new CustomEvent("findr:show-directions"));
+              }}
+              title="Show directions"
+            >
+              <svg
+                className="h-[28px] w-[28px]"
+                viewBox="0 0 24 24"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                {/* Diamond frame - rotated square */}
+                <rect
+                  x="6"
+                  y="6"
+                  width="12"
+                  height="12"
+                  rx="1.5"
+                  transform="rotate(45 12 12)"
+                  fill="#00996B"
+                  stroke="#00996B"
+                  strokeWidth="0.8"
+                />
+                {/* Turn arrow: vertical line, 90° turn, horizontal line with arrowhead */}
+                <g
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  {/* Vertical segment from bottom-left going up */}
+                  <path d="M 9.5 15 L 9.5 11" />
+                  {/* Horizontal segment going right after the turn */}
+                  <path d="M 9.5 11 L 14.5 11" />
+                  {/* Triangular arrowhead pointing right */}
+                  <path d="M 12.5 9.5 L 14.5 11 L 12.5 12.5" fill="none" />
+                </g>
+              </svg>
+            </button>
 
             {searchQuery.trim() && !isLocked && (
               <div className="absolute left-0 right-0 mt-2 bg-popover rounded-xl shadow-lg overflow-hidden">
@@ -192,7 +234,7 @@ export function MapControls({
           </div>
 
           {/* RESTORED ORIGINAL FILTER BUTTON */}
-          <Popover>
+          {/* <Popover>
             <PopoverTrigger asChild>
               <Button className="h-11 w-11 rounded-[19px] bg-[#009E61] text-white shadow-lg hover:bg-[#00B36D]">
                 <SlidersHorizontal
@@ -266,6 +308,7 @@ export function MapControls({
               </div>
             </PopoverContent>
           </Popover>
+          */}
         </div>
 
         {/* CATEGORY CHIPS CAROUSEL */}
@@ -302,4 +345,3 @@ export function MapControls({
     </>
   );
 }
-    
