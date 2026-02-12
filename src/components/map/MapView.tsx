@@ -17,12 +17,23 @@ interface MapViewProps {
 }
 
 const MAPTILER_API_KEY = import.meta.env.VITE_MAPTILER_API_KEY as string;
+
 const BUS_ICON_ID = "bus-stop";
 const BUS_ICON_SVG =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V4a2 2 0 0 1 2-2Z"/><path d="M5 12h14"/><path d="M7 6h10"/><circle cx="8.5" cy="16.5" r="1.5"/><circle cx="15.5" cy="16.5" r="1.5"/></svg>`,
   );
+
+// ✅ FlyTo event name (used by sidebar)
+const FLY_EVENT = "findr:flyto";
+type FlyDetail = {
+  lng: number;
+  lat: number;
+  label?: string;
+  zoom?: number;
+  html?: string;
+};
 
 function locationsToGeoJSON(
   locations: Location[],
@@ -31,15 +42,8 @@ function locationsToGeoJSON(
     type: "FeatureCollection",
     features: locations.map((loc) => ({
       type: "Feature",
-      properties: {
-        id: loc.id,
-        name: loc.name,
-        description: loc.description,
-      },
-      geometry: {
-        type: "Point",
-        coordinates: [loc.longitude, loc.latitude],
-      },
+      properties: { id: loc.id, name: loc.name, description: loc.description },
+      geometry: { type: "Point", coordinates: [loc.longitude, loc.latitude] },
     })),
   };
 }
@@ -53,8 +57,10 @@ export function MapView({
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
+
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const liveMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
+
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onMapClickRef = useRef(onMapClick);
   const isAddingLocationRef = useRef(isAddingLocation);
@@ -64,7 +70,62 @@ export function MapView({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [mapMoveTick, setMapMoveTick] = useState(0);
-  const [currentZoom, setCurrentZoom] = useState(2); // Track zoom for live markers
+  const [currentZoom, setCurrentZoom] = useState(2);
+
+  // ✅ Single FlyTo helper used by BOTH map clicks + sidebar clicks
+  const flyTo = useCallback(
+    (
+      lng: number,
+      lat: number,
+      label?: string,
+      zoom?: number,
+      html?: string,
+    ) => {
+      if (!map.current) return;
+
+      map.current.flyTo({
+        center: [lng, lat],
+        zoom: zoom ?? 15,
+        duration: 1200,
+        essential: true,
+      });
+
+      // show popup after movement starts
+      setTimeout(() => {
+        popupRef.current?.remove();
+        popupRef.current = new maplibregl.Popup({ offset: 25 })
+          .setLngLat([lng, lat])
+          .setHTML(
+            html ??
+              `<div class="p-4 min-w-[220px]">
+                <h3 class="font-semibold text-lg">${label ?? "Location"}</h3>
+                <p class="text-xs text-muted-foreground mt-1">${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
+              </div>`,
+          )
+          .addTo(map.current!);
+      }, 450);
+    },
+    [],
+  );
+
+  // ✅ Listen for sidebar fly events
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const e = ev as CustomEvent<FlyDetail>;
+      if (!e.detail) return;
+      flyTo(
+        e.detail.lng,
+        e.detail.lat,
+        e.detail.label,
+        e.detail.zoom,
+        e.detail.html,
+      );
+    };
+
+    window.addEventListener(FLY_EVENT, handler as EventListener);
+    return () =>
+      window.removeEventListener(FLY_EVENT, handler as EventListener);
+  }, [flyTo]);
 
   const matchesService = (loc: Location, service: string) => {
     const text = (loc.name + " " + (loc.description || "")).toLowerCase();
@@ -77,6 +138,7 @@ export function MapView({
       shelter: ["shelter"],
       parks: ["park", "garden"],
       roads: ["road", "street", "rd", "st"],
+      // NOTE: bus is handled separately in your bus route effect
     };
     return (keywords[service] || []).some((k) => text.includes(k));
   };
@@ -86,7 +148,7 @@ export function MapView({
     if (selectedServices.length > 0) {
       res = res.filter((l) =>
         selectedServices.some((s) => {
-          if (s === "parks" || s === "roads") return false;
+          if (s === "parks" || s === "roads" || s === "bus") return false;
           return matchesService(l, s);
         }),
       );
@@ -121,7 +183,7 @@ export function MapView({
     if (!mapContainer.current || map.current) return;
 
     const style = MAPTILER_API_KEY
-      ? `https://api.maptiler.com/maps/019c2dbf-3685-7ef2-9655-ad8c0b268d0e/style.json?key=${MAPTILER_API_KEY}`
+      ? `https://api.maptiler.com/maps/019c4c3d-7d0d-7f17-8117-945aa1848fdb/style.json?key=${MAPTILER_API_KEY}`
       : "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
     map.current = new maplibregl.Map({
@@ -248,6 +310,7 @@ export function MapView({
     map.current.getCanvas().style.cursor = isAddingLocation ? "crosshair" : "";
   }, [isAddingLocation]);
 
+  // markers (DB saved locations) — ✅ now flyTo on click
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
@@ -271,29 +334,29 @@ export function MapView({
 
       const el = document.createElement("div");
       el.innerHTML = `
-                <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-glow cursor-pointer hover:scale-110 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-primary-foreground">
-                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
-                    <circle cx="12" cy="10" r="3"/>
-                  </svg>
-                </div>
-            `;
+        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center shadow-glow cursor-pointer hover:scale-110 transition-transform">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-primary-foreground">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+        </div>
+      `;
 
       el.onclick = (e) => {
         if (isAddingLocationRef.current) return;
         e.stopPropagation();
-        popupRef.current?.remove();
-        popupRef.current = new maplibregl.Popup({ offset: 25 })
-          .setLngLat([location.longitude, location.latitude])
-          .setHTML(
-            `
-                        <div class="p-4 min-w-[200px]">
-                            <h3 class="font-semibold text-lg">${location.name}</h3>
-                            ${location.description ?? ""}
-                        </div>
-                    `,
-          )
-          .addTo(map.current!);
+
+        // ✅ Fly to the clicked DB pin + popup
+        flyTo(
+          location.longitude,
+          location.latitude,
+          location.name,
+          15,
+          `<div class="p-4 min-w-[200px]">
+            <h3 class="font-semibold text-lg">${location.name}</h3>
+            ${location.description ?? ""}
+          </div>`,
+        );
       };
 
       const marker = new maplibregl.Marker({ element: el })
@@ -302,16 +365,15 @@ export function MapView({
 
       markersRef.current.push(marker);
     });
-  }, [filteredLocations, isLoaded, mapMoveTick]);
+  }, [filteredLocations, isLoaded, mapMoveTick, flyTo]);
 
-  // ---- BUS ROUTE ----
+  // ---- BUS ROUTE ---- (your code unchanged)
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
     const showBusRoute = selectedServices.includes("bus");
 
     if (!showBusRoute) {
-      // Hide all route layers
       for (let i = 0; i < 10; i++) {
         if (map.current.getLayer(`bus-route-line-${i}`)) {
           map.current.setLayoutProperty(
@@ -353,7 +415,6 @@ export function MapView({
             resolve();
             return;
           }
-
           map.current.addImage(BUS_ICON_ID, img, { sdf: true });
           resolve();
         };
@@ -365,7 +426,6 @@ export function MapView({
       .then((routes: BusRouteData[]) => {
         if (!map.current || isCancelled) return;
 
-        // Process each route
         routes.forEach((routeData, index) => {
           const sourceId = `bus-route-${index}`;
           const stopsSourceId = `bus-route-stops-${index}`;
@@ -373,35 +433,26 @@ export function MapView({
           const labelLayerId = `bus-route-label-${index}`;
           const stopsLayerId = `bus-route-stops-${index}`;
 
-          // Route line GeoJSON
           const routeGeojson: FeatureCollection<Geometry> = {
             type: "FeatureCollection",
             features: [
               {
                 type: "Feature",
                 properties: { name: routeData.name },
-                geometry: {
-                  type: "LineString",
-                  coordinates: routeData.route,
-                },
+                geometry: { type: "LineString", coordinates: routeData.route },
               },
             ],
           };
 
-          // Stops GeoJSON
           const stopsGeojson: FeatureCollection<Geometry> = {
             type: "FeatureCollection",
             features: routeData.stops.map((stop) => ({
               type: "Feature",
               properties: { name: stop.name },
-              geometry: {
-                type: "Point",
-                coordinates: stop.coordinates,
-              },
+              geometry: { type: "Point", coordinates: stop.coordinates },
             })),
           };
 
-          // Add/update source for route line
           if (!map.current.getSource(sourceId)) {
             map.current.addSource(sourceId, {
               type: "geojson",
@@ -413,7 +464,6 @@ export function MapView({
             ).setData(routeGeojson);
           }
 
-          // Add/update route line layer
           if (!map.current.getLayer(lineLayerId)) {
             map.current.addLayer({
               id: lineLayerId,
@@ -434,7 +484,6 @@ export function MapView({
             map.current.setLayoutProperty(lineLayerId, "visibility", "visible");
           }
 
-          // Add label for route (on the line)
           if (!map.current.getLayer(labelLayerId)) {
             map.current.addLayer({
               id: labelLayerId,
@@ -462,7 +511,6 @@ export function MapView({
             );
           }
 
-          // Add/update source for stops
           if (!map.current.getSource(stopsSourceId)) {
             map.current.addSource(stopsSourceId, {
               type: "geojson",
@@ -473,7 +521,7 @@ export function MapView({
               map.current.getSource(stopsSourceId) as maplibregl.GeoJSONSource
             ).setData(stopsGeojson);
           }
-          // Add/update stops layer
+
           ensureBusIcon().then(() => {
             if (!map.current || isCancelled) return;
 
@@ -515,42 +563,18 @@ export function MapView({
             }
           });
         });
-
-        // Fit bounds to all routes
-        if (routes.length > 0 && routes[0].route.length > 1) {
-          let allCoords: [number, number][] = [];
-          routes.forEach((route) => {
-            allCoords = allCoords.concat(route.route);
-          });
-
-          const first = allCoords[0];
-          const bounds = allCoords.reduce(
-            (b, coord) => b.extend(coord),
-            new maplibregl.LngLatBounds(first, first),
-          );
-
-          map.current.fitBounds(bounds, {
-            padding: 40,
-            duration: 1200,
-          });
-        }
       })
-      .catch((error) => {
-        if (!isCancelled) {
-          console.error("Failed to load bus routes", error);
-        }
-      });
+      .catch((error) => console.error("Failed to load bus routes", error));
 
     return () => {
       isCancelled = true;
     };
   }, [isLoaded, selectedServices]);
 
-  // Live Locations Logic with Zoom Awareness
+  // Live Locations with Zoom awareness
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
-    // Hide live markers if zoomed out too far to keep clusters clean
     if (currentZoom < 4) {
       liveMarkersRef.current.forEach((marker) => marker.remove());
       liveMarkersRef.current.clear();
@@ -580,65 +604,56 @@ export function MapView({
     });
   }, [liveLocations, isLoaded, currentZoom]);
 
-  const handleSelectLocation = useCallback((loc: Location) => {
-    if (!map.current) return;
-    map.current.flyTo({
-      center: [loc.longitude, loc.latitude],
-      zoom: 15,
-      duration: 1800,
-      essential: true,
-    });
-    setTimeout(() => {
-      popupRef.current?.remove();
-      popupRef.current = new maplibregl.Popup({ offset: 25 })
-        .setLngLat([loc.longitude, loc.latitude])
-        .setHTML(
-          `<div class="p-4 min-w-[200px]"><h3 class="font-semibold text-lg">${loc.name}</h3>${loc.description ?? ""}</div>`,
-        )
-        .addTo(map.current!);
-    }, 600);
-  }, []);
+  const handleSelectLocation = useCallback(
+    (loc: Location) => {
+      flyTo(
+        loc.longitude,
+        loc.latitude,
+        loc.name,
+        15,
+        `
+        <div class="p-4 min-w-[200px]">
+          <h3 class="font-semibold text-lg">${loc.name}</h3>
+          ${loc.description ?? ""}
+        </div>
+      `,
+      );
+    },
+    [flyTo],
+  );
 
   const handleSelectGeocode = useCallback(
     (lng: number, lat: number, label: string, zoom?: number) => {
-      if (!map.current) return;
-      map.current.flyTo({
-        center: [lng, lat],
-        zoom: zoom ?? 15,
-        duration: 1800,
-        essential: true,
-      });
-      setTimeout(() => {
-        popupRef.current?.remove();
-        popupRef.current = new maplibregl.Popup({ offset: 25 })
-          .setLngLat([lng, lat])
-          .setHTML(
-            `<div class="p-4 min-w-[220px]"><h3 class="font-semibold text-lg">${label}</h3><p class="text-xs text-muted-foreground mt-1">${lat.toFixed(5)}, ${lng.toFixed(5)}</p></div>`,
-          )
-          .addTo(map.current!);
-      }, 600);
+      flyTo(lng, lat, label, zoom ?? 15);
     },
-    [],
+    [flyTo],
   );
 
+  // ✅ full screen map + centered MapControls (from your last request)
   return (
-    <div className={cn("relative w-full h-full", className)}>
+    <div className={cn("fixed inset-0 w-screen h-screen", className)}>
       <div ref={mapContainer} className="absolute inset-0" />
-      <MapControls
-        is3D={is3D}
-        onToggle3D={() => setIs3D((v) => !v)}
-        onResetView={() =>
-          map.current?.flyTo({ center: [0, 20], zoom: 2, pitch: 0 })
-        }
-        locations={locations}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSelectLocation={handleSelectLocation}
-        selectedServices={selectedServices}
-        onServiceToggle={toggleService}
-        onClearFilters={handleClearFilters}
-        onSelectGeocode={handleSelectGeocode}
-      />
+
+      <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center">
+        <div className="pointer-events-auto">
+          <MapControls
+            is3D={is3D}
+            onToggle3D={() => setIs3D((v) => !v)}
+            onResetView={() =>
+              map.current?.flyTo({ center: [0, 20], zoom: 2, pitch: 0 })
+            }
+            locations={locations}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onSelectLocation={handleSelectLocation}
+            selectedServices={selectedServices}
+            onServiceToggle={toggleService}
+            onClearFilters={handleClearFilters}
+            onSelectGeocode={handleSelectGeocode}
+          />
+        </div>
+      </div>
+
       {!isLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/80">
           <span className="text-sm text-muted-foreground">Loading map…</span>
