@@ -1,0 +1,506 @@
+{
+  "Cape Town station": {
+    "station_name": "Cape Town station",
+    "has_departures": true,
+    "departures": [
+      "05:20",
+      "06:00",
+      "06:40",
+      "07:20",
+      "08:00",
+      "09:00",
+      "10:00",
+      "11:00",
+      "12:00",
+      "13:30",
+      "14:10",
+      "15:15",
+      "16:00",
+      "16:25"
+    ]
+  },
+  "Woodstock station": {
+    "station_name": "Woodstock station",
+    "has_departures": true,
+    "departures": [
+      "05:22",
+      "06:02",
+      "06:42",
+      "07:22",
+      "08:02",
+      "09:02",
+      "10:02",
+      "11:02",
+      "12:02",
+      "13:32",
+      "14:12",
+      "15:17",
+      "16:02",
+      "16:27"
+    ]
+  },
+  "Salt River station": {
+    "station_name": "Salt River station",
+    "has_departures": true,
+    "departures": [
+      "05:30",
+      "06:10",
+      "06:50",
+      "07:30",
+      "08:10",
+      "09:10",
+      "10:10",
+      "11:10",
+      "12:10",
+      "13:40",
+      "14:20",
+      "15:25",
+      "16:10",
+      "16:35"
+    ]
+  },
+  "Observatory station": {
+    "station_name": "Observatory station",
+    "has_departures": true,
+    "departures": [
+      "05:33",
+      "06:13",
+      "06:53",
+      "07:33",
+      "08:13",
+      "09:13",
+      "10:13",
+      "11:13",
+      "12:13",
+      "13:43",
+      "14:23",
+      "15:28",
+      "16:13",
+      "16:38"
+    ]
+  },
+  "Mowbray station": {
+    "station_name": "Mowbray station",
+    "has_departures": true,
+    "departures": [
+      "05:35",
+      "06:15",
+      "06:55",
+      "07:35",
+      "08:15",
+      "09:15",
+      "10:15",
+      "11:15",
+      "12:15",
+      "13:45",
+      "14:25",
+      "15:30",
+      "16:15",
+      "16:40"
+    ]
+  },
+  "Rosebank station": {
+    "station_name": "Rosebank station",
+    "has_departures": true,
+    "departures": [
+      "05:37",
+      "06:17",
+      "06:57",
+      "07:37",
+      "08:17",
+      "09:17",
+      "10:17",
+      "11:17",
+      "12:17",
+      "13:47",
+      "14:27",
+      "15:32",
+      "16:17",
+      "16:42"
+    ]
+  },
+  "Rondebosch station": {
+    "station_name": "Rondebosch station",
+    "has_departures": true,
+    "departures": [
+      "05:39",
+      "06:19",
+      "06:59",
+      "07:39",
+      "08:19",
+      "09:19",
+      "10:19",
+      "11:19",
+      "12:19",
+      "13:49",
+      "14:29",
+      "15:34",
+      "16:19",
+      "16:44"
+    ]
+  },
+  "Newlands station": {
+    "station_name": "Newlands station",
+    "has_departures": true,
+    "departures": [
+      "05:42",
+      "06:22",
+      "07:02",
+      "07:42",
+      "08:22",
+      "09:22",
+      "10:22",
+      "11:22",
+      "12:22",
+      "13:52",
+      "14:32",
+      "15:37",
+      "16:22",
+      "16:47"
+    ]
+  },
+  "Claremont station": {
+    "station_name": "Claremont station",
+    "has_departures": true,
+    "departures": [
+      "05:44",
+      "06:24",
+      "07:04",
+      "07:44",
+      "08:24",
+      "09:24",
+      "10:24",
+      "11:24",
+      "12:24",
+      "13:54",
+      "14:36",
+      "15:39",
+      "16:24",
+      "16:49"
+    ]
+  },
+  "Harfield Rd station": {
+    "station_name": "Harfield Rd station",
+    "has_departures": true,
+    "departures": [
+      "05:46",
+      "06:26",
+      "07:06",
+      "07:46",
+      "08:26",
+      "09:26",
+      "10:26",
+      "11:26",
+      "12:26",
+      "13:56",
+      "14:36",
+      "15:41",
+      "16:26",
+      "16:51"
+    ]
+  },
+  "Kenilworth station": {
+    "station_name": "Kenilworth station",
+    "has_departures": true,
+    "departures": [
+      "05:48",
+      "06:28",
+      "07:08",
+      "07:48",
+      "08:28",
+      "09:28",
+      "10:28",
+      "11:28",
+      "12:28",
+      "13:58",
+      "14:38",
+      "15:43",
+      "16:28",
+      "16:53"
+    ]
+  },
+  "Wynberg station": {
+    "station_name": "Wynberg station",
+    "has_departures": true,
+    "departures": [
+      "05:50",
+      "06:30",
+      "07:10",
+      "07:50",
+      "08:30",
+      "09:30",
+      "10:30",
+      "11:30",
+      "12:30",
+      "14:00",
+      "14:40",
+      "15:45",
+      "16:30",
+      "16:55"
+    ]
+  },
+  "Wittebome station": {
+    "station_name": "Wittebome station",
+    "has_departures": true,
+    "departures": [
+      "05:52",
+      "06:32",
+      "07:12",
+      "07:52",
+      "08:32",
+      "09:32",
+      "10:32",
+      "11:32",
+      "12:32",
+      "14:02",
+      "14:42",
+      "15:47",
+      "16:32",
+      "16:57"
+    ]
+  },
+  "Plumstead station": {
+    "station_name": "Plumstead station",
+    "has_departures": true,
+    "departures": [
+      "05:54",
+      "06:34",
+      "07:14",
+      "07:54",
+      "08:34",
+      "09:34",
+      "10:34",
+      "11:34",
+      "12:34",
+      "14:04",
+      "14:44",
+      "15:49",
+      "16:34",
+      "16:59"
+    ]
+  },
+  "Steurhof station": {
+    "station_name": "Steurhof station",
+    "has_departures": true,
+    "departures": [
+      "05:56",
+      "06:36",
+      "07:16",
+      "07:56",
+      "08:36",
+      "09:36",
+      "10:36",
+      "11:36",
+      "12:36",
+      "14:06",
+      "14:46",
+      "16:01",
+      "16:36",
+      "17:01"
+    ]
+  },
+  "Dieprivier station": {
+    "station_name": "Dieprivier station",
+    "has_departures": true,
+    "departures": [
+      "05:58",
+      "06:38",
+      "07:18",
+      "07:58",
+      "08:38",
+      "09:38",
+      "10:38",
+      "11:38",
+      "12:38",
+      "14:08",
+      "14:48",
+      "15:53",
+      "16:38",
+      "17:03"
+    ]
+  },
+  "Heathfield station": {
+    "station_name": "Heathfield station",
+    "has_departures": true,
+    "departures": [
+      "06:00",
+      "06:40",
+      "07:20",
+      "08:00",
+      "08:40",
+      "09:40",
+      "10:40",
+      "11:40",
+      "12:40",
+      "14:10",
+      "14:50",
+      "16:40",
+      "16:55",
+      "17:05"
+    ]
+  },
+  "Retreat station": {
+    "station_name": "Retreat station",
+    "has_departures": true,
+    "departures": [
+      "06:03",
+      "06:43",
+      "07:23",
+      "08:03",
+      "08:43",
+      "09:43",
+      "10:43",
+      "11:43",
+      "12:43",
+      "14:13",
+      "14:53",
+      "15:58",
+      "16:43",
+      "17:08"
+    ]
+  },
+  "Steenberg station": {
+    "station_name": "Steenberg station",
+    "has_departures": true,
+    "departures": [
+      "06:06",
+      "06:46",
+      "07:26",
+      "08:06",
+      "08:46",
+      "09:46",
+      "10:46",
+      "11:46",
+      "12:46",
+      "14:16",
+      "14:56",
+      "16:01",
+      "16:46",
+      "17:11"
+    ]
+  },
+  "Lakeside station": {
+    "station_name": "Lakeside station",
+    "has_departures": true,
+    "departures": [
+      "06:08",
+      "06:48",
+      "07:28",
+      "08:08",
+      "08:48",
+      "09:48",
+      "10:48",
+      "11:48",
+      "12:48",
+      "14:18",
+      "14:58",
+      "16:03",
+      "16:48",
+      "17:13"
+    ]
+  },
+  "False Bay station": {
+    "station_name": "False Bay station",
+    "has_departures": true,
+    "departures": [
+      "06:11",
+      "07:01",
+      "07:31",
+      "08:11",
+      "08:51",
+      "09:51",
+      "11:01",
+      "11:51",
+      "12:51",
+      "14:21",
+      "15:01",
+      "16:06",
+      "16:51",
+      "17:16"
+    ]
+  },
+  "Muizenberg station": {
+    "station_name": "Muizenberg station",
+    "has_departures": true,
+    "departures": [
+      "06:13",
+      "06:53",
+      "07:33",
+      "08:13",
+      "08:53",
+      "09:53",
+      "10:53",
+      "11:53",
+      "12:53",
+      "14:23",
+      "15:03",
+      "16:08",
+      "16:53",
+      "17:18"
+    ]
+  },
+  "St James station": {
+    "station_name": "St James station",
+    "has_departures": true,
+    "departures": [
+      "06:16",
+      "06:56",
+      "07:36",
+      "08:16",
+      "08:56",
+      "09:56",
+      "10:56",
+      "11:56",
+      "12:56",
+      "14:26",
+      "15:06",
+      "16:11",
+      "16:56",
+      "17:21"
+    ]
+  },
+  "Kalk Bay station": {
+    "station_name": "Kalk Bay station",
+    "has_departures": true,
+    "departures": [
+      "06:18",
+      "06:58",
+      "07:38",
+      "08:18",
+      "08:58",
+      "09:58",
+      "10:58",
+      "11:58",
+      "12:58",
+      "14:28",
+      "15:08",
+      "16:13",
+      "16:58",
+      "17:23"
+    ]
+  },
+  "Fish Hoek station": {
+    "station_name": "Fish Hoek station",
+    "has_departures": false,
+    "departures": [],
+    "note": "No Saturday service"
+  },
+  "Sunny Cove station": {
+    "station_name": "Sunny Cove station",
+    "has_departures": false,
+    "departures": [],
+    "note": "No Saturday service"
+  },
+  "Glencairn station": {
+    "station_name": "Glencairn station",
+    "has_departures": false,
+    "departures": [],
+    "note": "No Saturday service"
+  },
+  "Simon's Town station": {
+    "station_name": "Simon's Town station",
+    "has_departures": false,
+    "departures": [],
+    "note": "No Saturday service"
+  }
+}

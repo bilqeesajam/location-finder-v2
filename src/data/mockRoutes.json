@@ -1,0 +1,352 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.427190924514157, -33.92363507409255]
+      },
+      "properties": {
+        "station_name": "Cape Town station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.4461656826218, -33.925019853621805]
+      },
+      "properties": {
+        "station_name": "Woodstock station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.464708731617275, -33.927532299736754]
+      },
+      "properties": {
+        "station_name": "Salt River station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.471494353786564, -33.938376462892045]
+      },
+      "properties": {
+        "station_name": "Observatory station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.473956584473633, -33.94665562338733]
+      },
+      "properties": {
+        "station_name": "Mowbray station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.47318331577901, -33.954885407811304]
+      },
+      "properties": {
+        "station_name": "Rosebank station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.47246469611587, -33.96215797319099]
+      },
+      "properties": {
+        "station_name": "Rondebosch station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.467557990295703, -33.974355899365335]
+      },
+      "properties": {
+        "station_name": "Newlands station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.46694750960926, -33.98150092511908]
+      },
+      "properties": {
+        "station_name": "Claremont station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.471258373101943, -33.98835724823596]
+      },
+      "properties": {
+        "station_name": "Harfield Rd station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.47318526701365, -33.99514979164771]
+      },
+      "properties": {
+        "station_name": "Kenilworth station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.47102871324295, -34.00470215303164]
+      },
+      "properties": {
+        "station_name": "Wynberg station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.47083315372041, -34.01439834853357]
+      },
+      "properties": {
+        "station_name": "Wittebome station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.46949945021453, -34.02180440583075]
+      },
+      "properties": {
+        "station_name": "Plumstead station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.468922946118955, -34.02933703010663]
+      },
+      "properties": {
+        "station_name": "Steurhof station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.466880005909776, -34.03531745953799]
+      },
+      "properties": {
+        "station_name": "Dieprivier station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.465564267283852, -34.04588052624932]
+      },
+      "properties": {
+        "station_name": "Heathfield station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.46299907310523, -34.05988889150205]
+      },
+      "properties": {
+        "station_name": "Retreat station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.463672560498637, -34.07660575760418]
+      },
+      "properties": {
+        "station_name": "Steenberg station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.462440380778197, -34.08846494381364]
+      },
+      "properties": {
+        "station_name": "Lakeside station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.4686777326298, -34.10244390223332]
+      },
+      "properties": {
+        "station_name": "False Bay station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.46797865379426, -34.10959334067815]
+      },
+      "properties": {
+        "station_name": "Muizenberg station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.458279780779588, -34.11918190891543]
+      },
+      "properties": {
+        "station_name": "St James station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.44993273845162, -34.126182054503516]
+      },
+      "properties": {
+        "station_name": "Kalk Bay station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.432502590303077, -34.13710790112989]
+      },
+      "properties": {
+        "station_name": "Fish Hoek station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.437255596124132, -34.144460014217834]
+      },
+      "properties": {
+        "station_name": "Sunny Cove station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.43192899612505, -34.16330542386042]
+      },
+      "properties": {
+        "station_name": "Glencairn station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [18.42536026729014, -34.18680207313169]
+      },
+      "properties": {
+        "station_name": "Simonstown station"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [18.427190924514157, -33.92363507409255],
+          [18.43470, -33.92426],
+          [18.4461656826218, -33.925019853621805],
+          [18.45544, -33.92627],
+          [18.464708731617275, -33.927532299736754],
+          [18.46855, -33.93143],
+          [18.471494353786564, -33.938376462892045],
+          [18.472725, -33.94252],
+          [18.473956584473633, -33.94665562338733],
+          [18.47357, -33.95077],
+          [18.47318331577901, -33.954885407811304],
+          [18.47282, -33.96102],
+          [18.47246469611587, -33.96215797319099],
+          [18.47052, -33.96825],
+          [18.467557990295703, -33.974355899365335],
+          [18.46724, -33.97793],
+          [18.46694750960926, -33.98150092511908],
+          [18.46909, -33.98493],
+          [18.471258373101943, -33.98835724823596],
+          [18.47222, -33.99215],
+          [18.47318526701365, -33.99514979164771],
+          [18.47210, -34.00007],
+          [18.47102871324295, -34.00470215303164],
+          [18.47112, -34.00951],
+          [18.47122226674652, -34.01432373183546],
+          [18.47036, -34.01806],
+          [18.46949945021453, -34.02180440583075],
+          [18.46921, -34.02557],
+          [18.468922946118955, -34.02933703010663],
+          [18.46786, -34.03233],
+          [18.466880005909776, -34.03531745953799],
+          [18.46622, -34.04060],
+          [18.465564267283852, -34.04588052624932],
+          [18.46427, -34.05289],
+          [18.46299907310523, -34.05988889150205],
+          [18.46334, -34.06825],
+          [18.463672560498637, -34.07660575760418],
+          [18.46305, -34.08254],
+          [18.462440380778197, -34.08846494381364],
+          [18.46578, -34.09545],
+          [18.4686777326298, -34.10244390223332],
+          [18.46833, -34.10602],
+          [18.46797865379426, -34.10959334067815],
+          [18.46263, -34.11439],
+          [18.458279780779588, -34.11918190891543],
+          [18.45411, -34.12069],
+          [18.44993273845162, -34.126182054503516],
+          [18.43621, -34.13165],
+          [18.432502590303077, -34.13710790112989],
+          [18.43488, -34.14078],
+          [18.437255596124132, -34.144460014217834],
+          [18.43459, -34.15388],
+          [18.43192899612505, -34.16330542386042],
+          [18.42864, -34.17505],
+          [18.42536026729014, -34.18680207313169]
+        ]
+      },
+      "properties": {
+        "line_name": "False Bay Line",
+        "type": "train_line"
+      }
+    }
+  ]
+}
