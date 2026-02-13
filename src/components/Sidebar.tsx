@@ -2,6 +2,7 @@ import * as React from "react";
 import {
   Search,
   Bus,
+  Train,
   PersonStanding,
   Car,
   ArrowUpDown,
@@ -14,11 +15,12 @@ import {
 import { cn } from "@/lib/utils";
 import { useLocations } from "@/hooks/useLocations";
 import type { Location } from "@/hooks/useLocations";
+import { getTrainRouteDistance, findClosestPointOnRoute } from "@/lib/trainRouting";
 
 const BG = "#15292F";
 const ACCENT = "#009E61";
 
-type TransportMode = "drive" | "walk" | "transit";
+type TransportMode = "drive" | "walk" | "transit" | "train";
 
 export type SuggestedPlace = {
   id: string;
@@ -136,6 +138,15 @@ export function Sidebar({
     return window.innerWidth >= 768;
   });
 
+  // Dispatch custom event when mode changes
+  React.useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("findr:modechange", {
+        detail: { mode },
+      }),
+    );
+  }, [mode]);
+
   // ✅ don't force-open on desktop resize (respects user collapsing)
   React.useEffect(() => {
     const onResize = () => {
@@ -240,6 +251,18 @@ export function Sidebar({
           title = "Bus / transit estimate";
           subtitle0 = "Estimate (no timetable yet)";
           subtitle1 = "Alternative estimate";
+        } else if (mode === "train") {
+          // Calculate train route
+          const trainDistance = getTrainRouteDistance();
+          // Estimate train travel time (average 50 km/h)
+          const estimatedTrainTime = (trainDistance / 50) * 3600;
+          chosen = [{
+            duration: estimatedTrainTime,
+            distance: trainDistance,
+          }];
+          title = "Train route (False Bay Line)";
+          subtitle0 = "Cape Town to Simon's Town";
+          subtitle1 = "Primary route";
         } else {
           chosen = driveRoutes;
           title = "Driving route";
@@ -484,6 +507,12 @@ export function Sidebar({
                 onClick={() => setMode("transit")}
               >
                 <Bus className="h-5 w-5" />
+              </ModeBtn>
+              <ModeBtn
+                active={mode === "train"}
+                onClick={() => setMode("train")}
+              >
+                <Train className="h-5 w-5" />
               </ModeBtn>
             </div>
           </div>

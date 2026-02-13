@@ -7,6 +7,8 @@ import { LiveLocation } from "@/hooks/useLiveLocations";
 import { MapControls } from "./MapControls";
 import { cn } from "@/lib/utils";
 import { getBusRoute, type BusRouteData } from "@/lib/busRoute";
+import { getTrainRouteFromMap, getStationsWithDistances } from "@/lib/trainRouting";
+import trainSchedules from "@/data/trainSchedules.json";
 
 interface MapViewProps {
   locations: Location[];
@@ -23,6 +25,13 @@ const BUS_ICON_SVG =
   "data:image/svg+xml;utf8," +
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V4a2 2 0 0 1 2-2Z"/><path d="M5 12h14"/><path d="M7 6h10"/><circle cx="8.5" cy="16.5" r="1.5"/><circle cx="15.5" cy="16.5" r="1.5"/></svg>`,
+  );
+
+const TRAIN_ICON_ID = "train-stop";
+const TRAIN_ICON_SVG =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="M7 6h10v9a3 3 0 0 1-3 3H10a3 3 0 0 1-3-3V6z"/><path d="M8 19v1a1 1 0 0 0 1 1h1"/><path d="M16 19v1a1 1 0 0 1-1 1h-1"/></svg>`,
   );
 
 // ✅ FlyTo event name (used by sidebar)
@@ -60,6 +69,7 @@ export function MapView({
 
   const markersRef = useRef<maplibregl.Marker[]>([]);
   const liveMarkersRef = useRef<Map<string, maplibregl.Marker>>(new Map());
+  const trainStationMarkersRef = useRef<maplibregl.Marker[]>([]);
 
   const popupRef = useRef<maplibregl.Popup | null>(null);
   const onMapClickRef = useRef(onMapClick);
@@ -71,6 +81,7 @@ export function MapView({
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [mapMoveTick, setMapMoveTick] = useState(0);
   const [currentZoom, setCurrentZoom] = useState(2);
+  const [currentMode, setCurrentMode] = useState<"drive" | "walk" | "transit" | "train">("drive");
 
   // ✅ Single FlyTo helper used by BOTH map clicks + sidebar clicks
   const flyTo = useCallback(
@@ -126,6 +137,19 @@ export function MapView({
     return () =>
       window.removeEventListener(FLY_EVENT, handler as EventListener);
   }, [flyTo]);
+
+  // ✅ Listen for mode change events
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const e = ev as CustomEvent<{ mode: string }>;
+      if (!e.detail) return;
+      setCurrentMode(e.detail.mode as any);
+    };
+
+    window.addEventListener("findr:modechange", handler as EventListener);
+    return () =>
+      window.removeEventListener("findr:modechange", handler as EventListener);
+  }, []);
 
   const matchesService = (loc: Location, service: string) => {
     const text = (loc.name + " " + (loc.description || "")).toLowerCase();
@@ -371,7 +395,7 @@ export function MapView({
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
-    const showBusRoute = selectedServices.includes("bus");
+    const showBusRoute = selectedServices.includes("bus") || currentMode === "transit";
 
     if (!showBusRoute) {
       for (let i = 0; i < 10; i++) {
@@ -570,6 +594,226 @@ export function MapView({
       isCancelled = true;
     };
   }, [isLoaded, selectedServices]);
+
+  // ---- TRAIN ROUTE ----
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+
+    const showTrainRoute = currentMode === "train";
+
+    if (!showTrainRoute) {
+      if (map.current.getLayer("train-route-line")) {
+        map.current.setLayoutProperty("train-route-line", "visibility", "none");
+      }
+      if (map.current.getLayer("train-route-label")) {
+        map.current.setLayoutProperty("train-route-label", "visibility", "none");
+      }
+      return;
+    }
+
+    try {
+      const trainRoute = getTrainRouteFromMap();
+
+      const trainGeojson: FeatureCollection<Geometry> = {
+        type: "FeatureCollection",
+        features: [trainRoute as any],
+      };
+
+      const sourceId = "train-route-src";
+      const lineLayerId = "train-route-line";
+      const labelLayerId = "train-route-label";
+
+      if (!map.current.getSource(sourceId)) {
+        map.current.addSource(sourceId, {
+          type: "geojson",
+          data: trainGeojson,
+        });
+      } else {
+        (
+          map.current.getSource(sourceId) as maplibregl.GeoJSONSource
+        ).setData(trainGeojson);
+      }
+
+      if (!map.current.getLayer(lineLayerId)) {
+        map.current.addLayer({
+          id: lineLayerId,
+          type: "line",
+          source: sourceId,
+          paint: {
+            "line-color": "#FF0000",
+            "line-width": 4,
+            "line-opacity": 0.8,
+          },
+        });
+      } else {
+        map.current.setPaintProperty(lineLayerId, "line-color", "#FF0000");
+        map.current.setLayoutProperty(lineLayerId, "visibility", "visible");
+      }
+
+      if (!map.current.getLayer(labelLayerId)) {
+        map.current.addLayer({
+          id: labelLayerId,
+          type: "symbol",
+          source: sourceId,
+          layout: {
+            "text-field": ["get", "name"],
+            "text-size": 12,
+            "text-font": ["Open Sans Semibold"],
+            "symbol-placement": "line",
+            "text-rotation-alignment": "map",
+            "text-pitch-alignment": "viewport",
+          },
+          paint: {
+            "text-color": "#ffffff",
+            "text-halo-color": "#FF0000",
+            "text-halo-width": 2,
+          },
+        });
+      } else {
+        map.current.setLayoutProperty(labelLayerId, "visibility", "visible");
+      }
+    } catch (error) {
+      console.error("Failed to load train route", error);
+    }
+  }, [isLoaded, currentMode]);
+
+  // ---- TRAIN STATION MARKERS ----
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+
+    const sourceId = "train-stops-src";
+    const layerId = "train-stops-layer";
+    let clickHandler: ((e: maplibregl.MapLayerMouseEvent) => void) | null = null;
+
+    const showTrain = currentMode === "train";
+
+    if (!showTrain) {
+      // hide layer if exists
+      if (map.current.getLayer(layerId)) {
+        map.current.setLayoutProperty(layerId, "visibility", "none");
+      }
+      return;
+    }
+
+    try {
+      const stations = getStationsWithDistances();
+
+      const stopsGeojson: FeatureCollection<Geometry> = {
+        type: "FeatureCollection",
+        features: stations.map((s) => ({
+          type: "Feature",
+          properties: { name: s.name },
+          geometry: { type: "Point", coordinates: [s.coordinates[0], s.coordinates[1]] },
+        })),
+      };
+
+      if (!map.current.getSource(sourceId)) {
+        map.current.addSource(sourceId, { type: "geojson", data: stopsGeojson });
+      } else {
+        (map.current.getSource(sourceId) as maplibregl.GeoJSONSource).setData(stopsGeojson);
+      }
+
+      const ensureTrainIcon = () =>
+        new Promise<void>((resolve) => {
+          if (!map.current || map.current.hasImage(TRAIN_ICON_ID)) {
+            resolve();
+            return;
+          }
+
+          const img = new Image(24, 24);
+          img.onload = () => {
+            if (!map.current || map.current.hasImage(TRAIN_ICON_ID)) {
+              resolve();
+              return;
+            }
+            map.current.addImage(TRAIN_ICON_ID, img, { sdf: true });
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = TRAIN_ICON_SVG;
+        });
+
+      ensureTrainIcon().then(() => {
+        if (!map.current) return;
+
+        if (!map.current.getLayer(layerId)) {
+          map.current.addLayer({
+            id: layerId,
+            type: "symbol",
+            source: sourceId,
+            layout: {
+                "icon-image": TRAIN_ICON_ID,
+                "icon-size": 1.4,
+                "icon-allow-overlap": true,
+                "text-field": ["get", "name"],
+                "text-size": 12,
+                "text-offset": [0, 1.2],
+                "text-anchor": "top",
+                "text-font": ["Open Sans Regular"],
+              },
+            paint: {
+              "icon-color": "#009E61",
+              "text-color": "#ffffff",
+              "text-halo-color": "#0F2A2E",
+            },
+          });
+        } else {
+          map.current.setLayoutProperty(layerId, "visibility", "visible");
+        }
+
+        // Click handler on the symbol layer
+        clickHandler = (e) => {
+          const feature = e.features && e.features[0];
+          if (!feature) return;
+          const coords = (feature.geometry as any).coordinates;
+          const name = feature.properties?.name as string;
+
+          const scheduleData = (trainSchedules as any)[name];
+          const departures: string[] = scheduleData?.departures || [];
+
+          const departureList = departures.length > 0
+            ? departures.map((time: string) => `<div style="padding:4px 0; font-size:12px; color:#ffffff">${time}</div>`).join("")
+            : `<div style="font-size:12px; color:#a0a0a0">No scheduled departures</div>`;
+
+          const popupHTML = `
+            <div style="padding:12px; min-width:200px; font-family:sans-serif; background:#15292F; border-radius:8px; border:1px solid rgba(0,158,97,0.3); color:#ffffff;">
+              <div style="font-weight:bold; color:#009E61; margin-bottom:8px; font-size:14px">${name}</div>
+              <div style="font-size:11px; font-weight:600; margin-bottom:8px; color:#a0a0a0; border-bottom:1px solid rgba(0,158,97,0.2); padding-bottom:6px">Departure Times:</div>
+              <div style="max-height:250px; overflow-y:auto; line-height:1.5">${departureList}</div>
+            </div>
+          `;
+
+          if (popupRef.current) popupRef.current.remove();
+          const popup = new maplibregl.Popup({ offset: 25, closeButton: true, closeOnClick: false })
+            .setHTML(popupHTML)
+            .setLngLat(coords as any)
+            .addTo(map.current!);
+          popupRef.current = popup;
+        };
+
+        map.current.on("click", layerId, clickHandler as any);
+      });
+    } catch (error) {
+      console.error("Failed to load train stations", error);
+    }
+
+    return () => {
+      try {
+        if (!map.current) return;
+        if (map.current.getLayer("train-stops-layer")) {
+          map.current.removeLayer("train-stops-layer");
+        }
+        if (map.current.getSource("train-stops-src")) {
+          map.current.removeSource("train-stops-src");
+        }
+        if (clickHandler && map.current) {
+          map.current.off("click", "train-stops-layer", clickHandler as any);
+        }
+      } catch (e) {
+        // ignore
+      }
+    };
+  }, [isLoaded, currentMode]);
 
   // Live Locations with Zoom awareness
   useEffect(() => {
