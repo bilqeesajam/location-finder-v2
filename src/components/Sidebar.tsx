@@ -1,15 +1,5 @@
 import * as React from "react";
-import {
-  MapPin,
-  Clock3,
-  Star,
-  Menu,
-  X,
-  Layers,
-  Check,
-  Mountain,
-  Bus,
-} from "lucide-react";
+import { MapPin, Clock3, Star, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocations } from "@/hooks/useLocations";
 import type { Location } from "@/hooks/useLocations";
@@ -35,7 +25,6 @@ interface SidebarProps {
 }
 
 const FLY_EVENT = "findr:flyto";
-const LAYERS_EVENT = "findr:layers";
 
 /* ---------- helpers ---------- */
 
@@ -63,6 +52,31 @@ function toSuggestedPlace(loc: Location): SuggestedPlace {
 
 function clampNum(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
+}
+
+/* ---------- UI piece ---------- */
+
+function GlassCard({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-[28px] border shadow-[0_30px_80px_rgba(0,0,0,0.38)] backdrop-blur-xl overflow-hidden",
+        className,
+      )}
+      style={{
+        background: `${BG}e6`,
+        borderColor: "rgba(255,255,255,0.10)",
+      }}
+    >
+      {children}
+    </div>
+  );
 }
 
 /* ---------- component ---------- */
@@ -98,52 +112,6 @@ export function Sidebar({ suggested, maxSuggested = 12 }: SidebarProps) {
     if (window.innerWidth < 768) setOpen(false);
   }, []);
 
-  /* ---------- Layers (ONLY terrain + transit) ---------- */
-
-  const [layersOpen, setLayersOpen] = React.useState(false);
-
-  // base: only terrain exists now (kept for future wiring if you want)
-  const [base] = React.useState<"terrain">("terrain");
-
-  // transit toggle (this is the only tile toggle now)
-  const [uiTiles, setUiTiles] = React.useState({
-    transit: false,
-  });
-
-  // overlays MapView uses
-  const [layerState, setLayerState] = React.useState({
-    savedPins: true,
-    suggestedPins: true,
-    busStops: true,
-    busRoutes: true,
-    livePeople: true,
-  });
-
-  const toggleLayer = (key: keyof typeof layerState) =>
-    setLayerState((s) => ({ ...s, [key]: !s[key] }));
-
-  // broadcast to MapView
-  React.useEffect(() => {
-    window.dispatchEvent(
-      new CustomEvent(LAYERS_EVENT, {
-        detail: {
-          ...layerState,
-          base, // still sent (terrain)
-          transit: uiTiles.transit,
-        },
-      }),
-    );
-  }, [layerState, base, uiTiles.transit]);
-
-  // close on ESC
-  React.useEffect(() => {
-    if (!layersOpen) return;
-    const onKey = (e: KeyboardEvent) =>
-      e.key === "Escape" && setLayersOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [layersOpen]);
-
   return (
     <>
       {/* Suggested toggle button */}
@@ -168,7 +136,7 @@ export function Sidebar({ suggested, maxSuggested = 12 }: SidebarProps) {
         )}
       </button>
 
-      {/* Backdrop on mobile for suggested */}
+      {/* Backdrop on mobile */}
       <div
         className={cn(
           "fixed inset-0 z-40 md:hidden transition-opacity",
@@ -320,262 +288,6 @@ export function Sidebar({ suggested, maxSuggested = 12 }: SidebarProps) {
           </div>
         </GlassCard>
       </aside>
-
-      {/* ✅ Layers button LEFT + 20px higher */}
-      <div className="fixed z-50 left-4 bottom-[calc(1rem+20px)]">
-        <div className="relative">
-          <button
-            onClick={() => setLayersOpen((v) => !v)}
-            className={cn(
-              "h-12 w-12 rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl",
-              "grid place-items-center transition hover:scale-[1.02] active:scale-[0.98]",
-            )}
-            style={{
-              background: `${BG}e6`,
-              borderColor: "rgba(255,255,255,0.10)",
-            }}
-            aria-label="Layers"
-            title="Layers"
-          >
-            <Layers className="h-5 w-5" style={{ color: ACCENT }} />
-          </button>
-
-          {/* click-away */}
-          {layersOpen && (
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setLayersOpen(false)}
-            />
-          )}
-
-          {/* ✅ Popup NEXT to button + SAME COLOR + scrollable */}
-          {layersOpen && (
-            <div
-              className={cn(
-                "absolute left-[60px] bottom-0 z-50",
-                "w-[360px] max-w-[calc(100vw-88px)]",
-                "rounded-[22px] border overflow-hidden",
-                "shadow-[0_22px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl",
-              )}
-              style={{
-                background: `${BG}e6`,
-                borderColor: "rgba(255,255,255,0.10)",
-                maxHeight: "min(72vh, 520px)",
-              }}
-            >
-              <div className="px-4 pt-4 pb-3 flex items-center justify-between">
-                <div className="leading-tight">
-                  <div className="text-white font-semibold text-sm">
-                    Map type
-                  </div>
-                  <div className="text-white/55 text-xs -mt-0.5">
-                    Terrain + Transit + overlays
-                  </div>
-                </div>
-
-                <button
-                  className={cn(
-                    "h-9 w-9 rounded-2xl border grid place-items-center",
-                    "transition hover:bg-white/5 active:scale-[0.98]",
-                  )}
-                  style={{ borderColor: "rgba(255,255,255,0.10)" }}
-                  onClick={() => setLayersOpen(false)}
-                  aria-label="Close layers"
-                  title="Close"
-                >
-                  <X className="h-4 w-4 text-white" />
-                </button>
-              </div>
-
-              {/* scroll body */}
-              <div
-                className="px-4 pb-4 overflow-y-auto scrollbar-hide"
-                style={{ maxHeight: "min(72vh, 520px)" }}
-              >
-                {/* Terrain (always selected) */}
-                <div className="grid grid-cols-2 gap-2">
-                  <BigBaseTile
-                    label="Terrain"
-                    active
-                    onClick={() => {
-                      /* terrain is always on */
-                    }}
-                    icon={<Mountain className="h-5 w-5 text-white/90" />}
-                    subtitle="Default"
-                  />
-
-                  {/* Transit toggle */}
-                  <BigBaseTile
-                    label="Transit"
-                    active={uiTiles.transit}
-                    onClick={() =>
-                      setUiTiles((s) => ({ ...s, transit: !s.transit }))
-                    }
-                    icon={<Bus className="h-5 w-5 text-white/90" />}
-                    subtitle={uiTiles.transit ? "On" : "Off"}
-                  />
-                </div>
-
-                {/* Overlays */}
-                <div className="mt-4">
-                  <div className="text-white/70 text-xs font-medium mb-2">
-                    Overlays
-                  </div>
-                  <div className="space-y-2">
-                    <LayerToggle
-                      label="Saved pins"
-                      enabled={layerState.savedPins}
-                      onClick={() => toggleLayer("savedPins")}
-                    />
-                    <LayerToggle
-                      label="Suggested pins"
-                      enabled={layerState.suggestedPins}
-                      onClick={() => toggleLayer("suggestedPins")}
-                    />
-                    <LayerToggle
-                      label="Bus stops"
-                      enabled={layerState.busStops}
-                      onClick={() => toggleLayer("busStops")}
-                    />
-                    <LayerToggle
-                      label="Bus routes"
-                      enabled={layerState.busRoutes}
-                      onClick={() => toggleLayer("busRoutes")}
-                    />
-                    <LayerToggle
-                      label="Live people"
-                      enabled={layerState.livePeople}
-                      onClick={() => toggleLayer("livePeople")}
-                    />
-                  </div>
-
-                  <button
-                    className="mt-3 w-full rounded-2xl border px-3 py-2 flex items-center justify-between hover:bg-white/5 transition"
-                    style={{ borderColor: "rgba(255,255,255,0.10)" }}
-                    onClick={() => setLayersOpen(false)}
-                  >
-                    <span className="text-white/80 text-sm">Done</span>
-                    <span className="text-white/45 text-xs">Close</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
     </>
-  );
-}
-
-/* ---------- UI pieces ---------- */
-
-function GlassCard({
-  className,
-  children,
-}: {
-  className?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-[28px] border shadow-[0_30px_80px_rgba(0,0,0,0.38)] backdrop-blur-xl overflow-hidden",
-        className,
-      )}
-      style={{
-        background: `${BG}e6`,
-        borderColor: "rgba(255,255,255,0.10)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function BigBaseTile({
-  label,
-  icon,
-  active,
-  onClick,
-  subtitle,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  active: boolean;
-  onClick: () => void;
-  subtitle?: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "rounded-2xl border px-3 py-3 text-left transition hover:bg-white/5",
-      )}
-      style={{
-        borderColor: active ? `${ACCENT}66` : "rgba(255,255,255,0.10)",
-        boxShadow: active ? `0 0 0 1px ${ACCENT}55 inset` : undefined,
-      }}
-    >
-      <div className="flex items-center gap-2">
-        <div
-          className="h-10 w-10 rounded-2xl grid place-items-center border"
-          style={{
-            borderColor: "rgba(255,255,255,0.10)",
-            background: "rgba(0,0,0,0.20)",
-          }}
-        >
-          {icon}
-        </div>
-        <div>
-          <div className="text-white text-sm font-semibold">{label}</div>
-          <div className="text-white/55 text-xs -mt-0.5">
-            {subtitle ?? (active ? "Selected" : "Tap to select")}
-          </div>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function LayerToggle({
-  label,
-  enabled,
-  onClick,
-}: {
-  label: string;
-  enabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "w-full rounded-2xl border px-3 py-2",
-        "flex items-center justify-between",
-        "transition hover:bg-white/5 active:scale-[0.99]",
-      )}
-      style={{
-        borderColor: "rgba(255,255,255,0.10)",
-        background: enabled ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.14)",
-      }}
-    >
-      <div className="text-sm text-white/90">{label}</div>
-      <div
-        className={cn(
-          "h-8 w-8 rounded-xl grid place-items-center border",
-          enabled ? "" : "opacity-70",
-        )}
-        style={{
-          borderColor: enabled ? `${ACCENT}55` : "rgba(255,255,255,0.12)",
-          color: enabled ? ACCENT : "rgba(255,255,255,0.55)",
-        }}
-      >
-        {enabled ? (
-          <Check className="h-4 w-4" />
-        ) : (
-          <span className="text-xs">—</span>
-        )}
-      </div>
-    </button>
   );
 }
