@@ -60,29 +60,115 @@ export function MapControls({
   selectedServices,
   onServiceToggle,
   onClearFilters,
+  onSelectGeocode,
 }: MapControlsProps) {
-  const [isLocked, setIsLocked] = React.useState(false);
+  const [geocodeResults, setGeocodeResults] = React.useState<
+    Array<{
+      id: string;
+      label: string;
+      subtitle: string;
+      lng: number;
+      lat: number;
+    }>
+  >([]);
+  const [isGeocoding, setIsGeocoding] = React.useState(false);
   const scrollRef = React.useRef<HTMLDivElement>(null);
 
   const results = React.useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q || isLocked) return [];
+    if (!q) return [];
     return locations.filter(
       (l) =>
         l.name.toLowerCase().includes(q) ||
         (l.description || "").toLowerCase().includes(q),
     );
-  }, [locations, searchQuery, isLocked]);
+  }, [locations, searchQuery]);
+
+  React.useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setGeocodeResults([]);
+      console.log("MapControls: skip geocoding - empty query");
+      return;
+    }
+
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      try {
+        setIsGeocoding(true);
+        // Using Nominatim (OpenStreetMap) - free, no API key needed
+        const url =
+          `https://nominatim.openstreetmap.org/search?` +
+          `q=${encodeURIComponent(q)}&` +
+          `countrycodes=za&` +
+          `format=json&` +
+          `limit=12&` +
+          `addressdetails=1`;
+        console.log("MapControls: fetching geocoding from Nominatim", { q });
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error("Geocoding failed");
+        const data = await res.json();
+        console.log("MapControls: geocoding response", { count: data?.length });
+        const items = (data ?? []).map((f: any, idx: number) => {
+          const placeName = String(f?.display_name ?? q);
+          // Parse display_name which is comma-separated
+          const parts = placeName
+            .split(",")
+            .map((p: string) => p.trim())
+            .filter(Boolean);
+          const street = parts[0] ?? "";
+          const province = parts.length >= 2 ? parts[parts.length - 2] : "";
+          const city = parts.length >= 3 ? parts[parts.length - 3] : "";
+          const subtitle = [
+            street,
+            city && province ? `${city}, ${province}` : city || province,
+          ]
+            .filter(Boolean)
+            .join(" • ");
+
+          return {
+            id: String(f?.place_id ?? `nom-${idx}`),
+            label: placeName,
+            subtitle: subtitle || "South Africa",
+            lng: Number(f?.lon),
+            lat: Number(f?.lat),
+          };
+        });
+        const filtered = items.filter(
+          (i: any) => isFinite(i.lng) && isFinite(i.lat),
+        );
+        console.log("MapControls: parsed results", {
+          total: items.length,
+          valid: filtered.length,
+          samples: filtered.slice(0, 2),
+        });
+        setGeocodeResults(filtered);
+      } catch (err) {
+        console.error("MapControls: geocoding error", err);
+        if (!controller.signal.aborted) setGeocodeResults([]);
+      } finally {
+        if (!controller.signal.aborted) setIsGeocoding(false);
+      }
+    }, 250);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   const handlePickLocation = (loc: Location) => {
     onSearchChange(loc.name);
-    setIsLocked(true);
     onSelectLocation(loc);
   };
 
-  const handleUnlock = () => {
-    setIsLocked(false);
-    onSearchChange("");
+  const handlePickGeocode = (item: {
+    label: string;
+    lng: number;
+    lat: number;
+  }) => {
+    onSearchChange(item.label);
+    onSelectGeocode(item.lng, item.lat, item.label, 15);
   };
 
   const scrollNext = () => {
@@ -148,22 +234,11 @@ export function MapControls({
               aria-label="Search locations"
               value={searchQuery}
               onChange={(e) => {
-                if (isLocked) return;
                 onSearchChange(e.target.value);
               }}
               placeholder="Search"
-              readOnly={isLocked}
               className="h-12 pl-12 pr-12 rounded-[20px] bg-[#0F2A2E]/90 text-white placeholder:text-[13px] placeholder-font-medium placeholder:text-slate-300 border-none shadow-lg backdrop-blur-md focus-visible:ring-0"
             />
-
-            {isLocked && (
-              <button
-                onClick={handleUnlock}
-                className="absolute right-12 top-1/2 -translate-y-1/2 text-xs text-white/80 hover:text-white"
-              >
-                Clear
-              </button>
-            )}
 
             <button
               className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center justify-center transition-all hover:scale-110"
@@ -207,27 +282,47 @@ export function MapControls({
               </svg>
             </button>
 
-            {searchQuery.trim() && !isLocked && (
-              <div className="absolute left-0 right-0 mt-2 bg-popover rounded-xl shadow-lg overflow-hidden">
-                {results.length === 0 ? (
+            {searchQuery.trim() && (
+              <div className="absolute left-0 right-0 mt-2 bg-popover rounded-xl shadow-lg overflow-hidden z-40">
+                {isGeocoding &&
+                results.length === 0 &&
+                geocodeResults.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground">
+                    Searching South Africa...
+                  </div>
+                ) : results.length === 0 && geocodeResults.length === 0 ? (
                   <div className="p-3 text-sm text-muted-foreground">
                     No results
                   </div>
                 ) : (
-                  results.slice(0, 6).map((r) => (
-                    <button
-                      key={r.id}
-                      onClick={() => handlePickLocation(r)}
-                      className="w-full text-left px-4 py-3 hover:bg-accent/40"
-                    >
-                      <div className="font-semibold">{r.name}</div>
-                      {r.description && (
+                  <>
+                    {results.slice(0, 3).map((r) => (
+                      <button
+                        key={`local-${r.id}`}
+                        onClick={() => handlePickLocation(r)}
+                        className="w-full text-left px-4 py-3 hover:bg-accent/40 border-b border-white/5"
+                      >
+                        <div className="font-semibold">{r.name}</div>
+                        {r.description && (
+                          <div className="text-xs text-muted-foreground truncate">
+                            {r.description}
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                    {geocodeResults.slice(0, 8).map((g) => (
+                      <button
+                        key={`geo-${g.id}`}
+                        onClick={() => handlePickGeocode(g)}
+                        className="w-full text-left px-4 py-3 hover:bg-accent/40"
+                      >
+                        <div className="font-semibold">{g.label}</div>
                         <div className="text-xs text-muted-foreground truncate">
-                          {r.description}
+                          {g.subtitle}
                         </div>
-                      )}
-                    </button>
-                  ))
+                      </button>
+                    ))}
+                  </>
                 )}
               </div>
             )}

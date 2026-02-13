@@ -63,8 +63,13 @@ function identifyBusStops(
       { name: 'Nyanga Junction', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.68, -34.037)] },
       { name: 'Philippi', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.51, -33.98)] },
       { name: 'Athlone', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.51, -33.96)] },
-      { name: 'Salt River', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.445, -33.932)] },
-      { name: 'Woodstock', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.438, -33.931)] },
+      { name: 'Maitland', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.485, -33.945)] },
+      { name: 'Observatory Junction', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.46, -33.94)] },
+      { name: 'Salt River Station', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.445, -33.932)] },
+      { name: 'Woodstock Station', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.438, -33.931)] },
+      { name: 'District Six', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.435, -33.930)] },
+      { name: 'Foreshore', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.427, -33.922)] },
+      { name: 'CTICC', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.425, -33.918)] },
       { name: 'Cape Town Station', coordinates: coordinates[coordinates.length - 1] }
     );
   } else if (routeName === 'GA0003') {
@@ -78,7 +83,11 @@ function identifyBusStops(
       { name: 'Parow', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.58, -33.91)] },
       { name: 'Maitland', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.50, -33.94)] },
       { name: 'Observatory', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.46, -33.94)] },
-      { name: 'Salt River', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.445, -33.932)] },
+      { name: 'Salt River Station', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.445, -33.932)] },
+      { name: 'Woodstock Exchange', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.438, -33.931)] },
+      { name: 'District Six', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.435, -33.930)] },
+      { name: 'Foreshore', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.427, -33.922)] },
+      { name: 'CTICC', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.425, -33.918)] },
       { name: 'Cape Town Station', coordinates: coordinates[coordinates.length - 1] }
     );
   } else if (routeName === 'GA0030') {
@@ -91,7 +100,12 @@ function identifyBusStops(
       { name: 'Goodwood', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.55, -33.93)] },
       { name: 'Parow', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.50, -33.93)] },
       { name: 'Maitland', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.47, -33.93)] },
-      { name: 'Woodstock', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.438, -33.931)] },
+      { name: 'Observatory', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.46, -33.94)] },
+      { name: 'Salt River Station', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.445, -33.932)] },
+      { name: 'Woodstock Station', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.438, -33.931)] },
+      { name: 'District Six', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.435, -33.930)] },
+      { name: 'Foreshore', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.427, -33.922)] },
+      { name: 'CTICC', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.425, -33.918)] },
       { name: 'Cape Town Station', coordinates: coordinates[coordinates.length - 1] }
     );
   } else if (routeName === 'GA0077') {
@@ -103,8 +117,13 @@ function identifyBusStops(
       { name: 'Lansdowne Road', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.54, -33.99)] },
       { name: 'Ottery', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.49, -33.95)] },
       { name: 'Wynberg', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.47, -33.98)] },
+      { name: 'Maitland', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.47, -33.93)] },
       { name: 'Observatory', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.46, -33.94)] },
-      { name: 'Woodstock', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.438, -33.931)] },
+      { name: 'Salt River Station', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.445, -33.932)] },
+      { name: 'Woodstock Station', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.438, -33.931)] },
+      { name: 'District Six', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.435, -33.930)] },
+      { name: 'Foreshore', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.427, -33.922)] },
+      { name: 'CTICC', coordinates: coordinates[findClosestWaypointIndex(coordinates, 18.425, -33.918)] },
       { name: 'Cape Town Station', coordinates: coordinates[coordinates.length - 1] }
     );
   } else {

@@ -127,6 +127,209 @@ export function MapView({
       window.removeEventListener(FLY_EVENT, handler as EventListener);
   }, [flyTo]);
 
+  // ✅ Listen for route updates and display on map
+  useEffect(() => {
+    const handleRouteUpdate = (ev: Event) => {
+      const e = ev as CustomEvent<{
+        geometry: any;
+        mode: string;
+        busRoute?: any;
+        fromStop?: number;
+        toStop?: number;
+      }>;
+      if (!map.current || !e.detail?.geometry || !isLoaded) return;
+
+      const isBusRoute = e.detail.mode === "bus";
+      const routeColor = isBusRoute ? "#c56b25" : "#009E61"; // Orange for bus, green for other
+
+      const routeSource = map.current.getSource("route-src");
+
+      // Create source if it doesn't exist
+      if (!routeSource) {
+        try {
+          map.current.addSource("route-src", {
+            type: "geojson",
+            data: {
+              type: "Feature",
+              geometry: e.detail.geometry,
+              properties: {},
+            },
+          });
+
+          // Add route layer
+          if (!map.current.getLayer("route-line")) {
+            map.current.addLayer({
+              id: "route-line",
+              type: "line",
+              source: "route-src",
+              layout: {
+                "line-join": "round",
+                "line-cap": "round",
+              },
+              paint: {
+                "line-color": routeColor,
+                "line-width": 5,
+                "line-opacity": 0.9,
+              },
+            });
+          } else {
+            // Update color if layer exists
+            map.current.setPaintProperty(
+              "route-line",
+              "line-color",
+              routeColor,
+            );
+          }
+
+          // Add animation layer (dashed effect)
+          if (!map.current.getLayer("route-line-anim")) {
+            map.current.addLayer({
+              id: "route-line-anim",
+              type: "line",
+              source: "route-src",
+              layout: {
+                "line-join": "round",
+                "line-cap": "round",
+              },
+              paint: {
+                "line-color": "#ffffff",
+                "line-width": 2,
+                "line-opacity": 0.6,
+                "line-dasharray": [2, 4],
+              },
+            });
+          }
+        } catch (err) {
+          console.error("Error adding route layer:", err);
+        }
+      } else {
+        // Update existing route
+        try {
+          (routeSource as maplibregl.GeoJSONSource).setData({
+            type: "Feature",
+            geometry: e.detail.geometry,
+            properties: {},
+          });
+
+          // Update color based on mode
+          if (map.current.getLayer("route-line")) {
+            map.current.setPaintProperty(
+              "route-line",
+              "line-color",
+              routeColor,
+            );
+          }
+        } catch (err) {
+          console.error("Error updating route:", err);
+        }
+      }
+
+      // If it's a bus route, show bus stops along the route
+      if (isBusRoute && e.detail.busRoute) {
+        const busRoute = e.detail.busRoute;
+        const fromStopIdx = e.detail.fromStop ?? 0;
+        const toStopIdx = e.detail.toStop ?? busRoute.stops.length - 1;
+
+        // Get stops between from and to
+        const relevantStops = busRoute.stops.slice(
+          Math.min(fromStopIdx, toStopIdx),
+          Math.max(fromStopIdx, toStopIdx) + 1,
+        );
+
+        // Add bus stops source and layer
+        const stopsSource = map.current!.getSource("route-bus-stops");
+        const stopsData = {
+          type: "FeatureCollection",
+          features: relevantStops.map((stop: any) => ({
+            type: "Feature",
+            geometry: {
+              type: "Point",
+              coordinates: stop.coordinates,
+            },
+            properties: { name: stop.name },
+          })),
+        };
+
+        if (!stopsSource) {
+          map.current!.addSource("route-bus-stops", {
+            type: "geojson",
+            data: stopsData as any,
+          });
+
+          // Ensure bus icon exists
+          if (!map.current!.hasImage(BUS_ICON_ID)) {
+            const img = new Image(24, 24);
+            img.onload = () => {
+              if (map.current && !map.current.hasImage(BUS_ICON_ID)) {
+                map.current.addImage(BUS_ICON_ID, img, { sdf: true });
+              }
+            };
+            img.src = BUS_ICON_SVG;
+          }
+
+          // Add stops layer with better visibility
+          setTimeout(() => {
+            if (map.current && !map.current.getLayer("route-bus-stops-layer")) {
+              console.log(
+                `🚏 Creating route-bus-stops-layer with ${relevantStops.length} stops`,
+              );
+              map.current.addLayer({
+                id: "route-bus-stops-layer",
+                type: "symbol",
+                source: "route-bus-stops",
+                layout: {
+                  "icon-image": BUS_ICON_ID,
+                  "icon-size": 0.8,
+                  "icon-allow-overlap": true,
+                  "icon-ignore-placement": false,
+                  "text-field": ["get", "name"],
+                  "text-font": [
+                    "Open Sans Semibold",
+                    "Arial Unicode MS Regular",
+                  ],
+                  "text-size": 10,
+                  "text-anchor": "top",
+                  "text-offset": [0, 1.8],
+                  "text-optional": true,
+                  "text-allow-overlap": true,
+                },
+                paint: {
+                  "icon-color": routeColor,
+                  "icon-opacity": 1,
+                  "text-color": "#ffffff",
+                  "text-halo-color": routeColor,
+                  "text-halo-width": 2,
+                  "text-halo-blur": 0.5,
+                },
+              });
+              console.log(`✅ Route bus stops layer created successfully`);
+            }
+          }, 150);
+        } else {
+          (stopsSource as maplibregl.GeoJSONSource).setData(stopsData as any);
+        }
+      } else {
+        // Remove bus stops if not a bus route
+        if (map.current.getLayer("route-bus-stops-layer")) {
+          map.current.removeLayer("route-bus-stops-layer");
+        }
+        if (map.current.getSource("route-bus-stops")) {
+          map.current.removeSource("route-bus-stops");
+        }
+      }
+    };
+
+    window.addEventListener(
+      "findr:route-update",
+      handleRouteUpdate as EventListener,
+    );
+    return () =>
+      window.removeEventListener(
+        "findr:route-update",
+        handleRouteUpdate as EventListener,
+      );
+  }, [isLoaded]);
+
   const matchesService = (loc: Location, service: string) => {
     const text = (loc.name + " " + (loc.description || "")).toLowerCase();
     const keywords: Record<string, string[]> = {
@@ -405,10 +608,12 @@ export function MapView({
     const ensureBusIcon = () =>
       new Promise<void>((resolve) => {
         if (!map.current || map.current.hasImage(BUS_ICON_ID)) {
+          console.log("🚏 Bus icon already loaded");
           resolve();
           return;
         }
 
+        console.log("🚏 Loading bus icon...");
         const img = new Image(24, 24);
         img.onload = () => {
           if (!map.current || map.current.hasImage(BUS_ICON_ID)) {
@@ -416,9 +621,13 @@ export function MapView({
             return;
           }
           map.current.addImage(BUS_ICON_ID, img, { sdf: true });
+          console.log("✅ Bus icon loaded successfully");
           resolve();
         };
-        img.onerror = () => resolve();
+        img.onerror = () => {
+          console.error("❌ Failed to load bus icon");
+          resolve();
+        };
         img.src = BUS_ICON_SVG;
       });
 
@@ -426,7 +635,19 @@ export function MapView({
       .then((routes: BusRouteData[]) => {
         if (!map.current || isCancelled) return;
 
+        console.log("🚌 Loading bus routes:", routes.length);
+
         routes.forEach((routeData, index) => {
+          // Skip routes with no coordinates
+          if (!routeData.route || routeData.route.length === 0) {
+            console.warn(`⚠️ Skipping ${routeData.name} - no coordinates`);
+            return;
+          }
+
+          console.log(
+            `  📍 ${routeData.name}: ${routeData.route.length} coords, ${routeData.stops.length} stops`,
+          );
+
           const sourceId = `bus-route-${index}`;
           const stopsSourceId = `bus-route-stops-${index}`;
           const lineLayerId = `bus-route-line-${index}`;
@@ -537,29 +758,39 @@ export function MapView({
                 source: stopsSourceId,
                 layout: {
                   "icon-image": BUS_ICON_ID,
-                  "icon-size": 1,
+                  "icon-size": 0.8,
                   "icon-allow-overlap": true,
+                  "icon-ignore-placement": false,
                   "text-field": ["get", "name"],
-                  "text-size": 11,
-                  "text-offset": [0, 1.5],
+                  "text-size": 10,
+                  "text-offset": [0, 1.8],
                   "text-anchor": "top",
-                  "text-font": ["Open Sans Regular"],
+                  "text-font": [
+                    "Open Sans Semibold",
+                    "Arial Unicode MS Regular",
+                  ],
+                  "text-optional": true,
+                  "text-allow-overlap": true,
                 },
                 paint: {
                   "icon-color": routeData.color,
-                  "icon-halo-color": "#0F2A2E",
-                  "icon-halo-width": 1.5,
+                  "icon-opacity": 1,
                   "text-color": "#ffffff",
-                  "text-halo-color": "#0F2A2E",
+                  "text-halo-color": routeData.color,
                   "text-halo-width": 2,
+                  "text-halo-blur": 0.5,
                 },
               });
+              console.log(
+                `✅ Bus stop layer created: ${stopsLayerId} with ${stopsGeojson.features.length} stops`,
+              );
             } else {
               map.current.setLayoutProperty(
                 stopsLayerId,
                 "visibility",
                 "visible",
               );
+              console.log(`👁️ Bus stop layer made visible: ${stopsLayerId}`);
             }
           });
         });
