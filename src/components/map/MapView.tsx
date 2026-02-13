@@ -25,7 +25,7 @@ const BUS_ICON_SVG =
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h10a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V4a2 2 0 0 1 2-2Z"/><path d="M5 12h14"/><path d="M7 6h10"/><circle cx="8.5" cy="16.5" r="1.5"/><circle cx="15.5" cy="16.5" r="1.5"/></svg>`,
   );
 
-// ✅ FlyTo event name (used by sidebar)
+// Events
 const FLY_EVENT = "findr:flyto";
 type FlyDetail = {
   lng: number;
@@ -34,6 +34,49 @@ type FlyDetail = {
   zoom?: number;
   html?: string;
 };
+
+const LAYERS_EVENT = "findr:layers";
+type LayersDetail = {
+  savedPins?: boolean;
+  suggestedPins?: boolean;
+  busStops?: boolean;
+  busRoutes?: boolean;
+  livePeople?: boolean;
+
+  // new UI toggles:
+  traffic?: boolean;
+  transit?: boolean;
+  biking?: boolean;
+  base?: "satellite" | "terrain";
+};
+
+/**
+ * ✅ SOUTH AFRICA bounds (approx)
+ * [[westLng, southLat], [eastLng, northLat]]
+ */
+const SOUTH_AFRICA_BOUNDS: maplibregl.LngLatBoundsLike = [
+  [16.3, -35.2],
+  [33.1, -22.0],
+];
+
+// Start in Cape Town
+const CT_CENTER: [number, number] = [18.4241, -33.9249];
+const CT_ZOOM = 10;
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+function clampToBounds(
+  lng: number,
+  lat: number,
+  boundsLike: maplibregl.LngLatBoundsLike,
+) {
+  const b = maplibregl.LngLatBounds.convert(boundsLike);
+  return {
+    lng: clamp(lng, b.getWest(), b.getEast()),
+    lat: clamp(lat, b.getSouth(), b.getNorth()),
+  };
+}
 
 function locationsToGeoJSON(
   locations: Location[],
@@ -46,6 +89,24 @@ function locationsToGeoJSON(
       geometry: { type: "Point", coordinates: [loc.longitude, loc.latitude] },
     })),
   };
+}
+
+// Best-effort: toggle existing style layers by matching ids
+function setMatchingLayersVisibility(
+  map: maplibregl.Map,
+  patterns: RegExp[],
+  visible: boolean,
+) {
+  const style = map.getStyle();
+  const layers = style?.layers ?? [];
+  for (const l of layers) {
+    if (!l?.id) continue;
+    if (patterns.some((r) => r.test(l.id))) {
+      if (map.getLayer(l.id)) {
+        map.setLayoutProperty(l.id, "visibility", visible ? "visible" : "none");
+      }
+    }
+  }
 }
 
 export function MapView({
@@ -70,9 +131,22 @@ export function MapView({
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [mapMoveTick, setMapMoveTick] = useState(0);
-  const [currentZoom, setCurrentZoom] = useState(2);
+  const [currentZoom, setCurrentZoom] = useState(CT_ZOOM);
 
-  // ✅ Single FlyTo helper used by BOTH map clicks + sidebar clicks
+  // ✅ all toggles from sidebar
+  const [layers, setLayers] = useState<Required<LayersDetail>>({
+    savedPins: true,
+    suggestedPins: true,
+    busStops: true,
+    busRoutes: true,
+    livePeople: true,
+
+    traffic: false,
+    transit: false,
+    biking: false,
+    base: "terrain",
+  });
+
   const flyTo = useCallback(
     (
       lng: number,
@@ -82,25 +156,25 @@ export function MapView({
       html?: string,
     ) => {
       if (!map.current) return;
+      const clamped = clampToBounds(lng, lat, SOUTH_AFRICA_BOUNDS);
 
       map.current.flyTo({
-        center: [lng, lat],
+        center: [clamped.lng, clamped.lat],
         zoom: zoom ?? 15,
         duration: 1200,
         essential: true,
       });
 
-      // show popup after movement starts
       setTimeout(() => {
         popupRef.current?.remove();
         popupRef.current = new maplibregl.Popup({ offset: 25 })
-          .setLngLat([lng, lat])
+          .setLngLat([clamped.lng, clamped.lat])
           .setHTML(
             html ??
               `<div class="p-4 min-w-[220px]">
-                <h3 class="font-semibold text-lg">${label ?? "Location"}</h3>
-                <p class="text-xs text-muted-foreground mt-1">${lat.toFixed(5)}, ${lng.toFixed(5)}</p>
-              </div>`,
+              <h3 class="font-semibold text-lg">${label ?? "Location"}</h3>
+              <p class="text-xs text-muted-foreground mt-1">${clamped.lat.toFixed(5)}, ${clamped.lng.toFixed(5)}</p>
+            </div>`,
           )
           .addTo(map.current!);
       }, 450);
@@ -108,7 +182,7 @@ export function MapView({
     [],
   );
 
-  // ✅ Listen for sidebar fly events
+  // fly events
   useEffect(() => {
     const handler = (ev: Event) => {
       const e = ev as CustomEvent<FlyDetail>;
@@ -121,11 +195,35 @@ export function MapView({
         e.detail.html,
       );
     };
-
     window.addEventListener(FLY_EVENT, handler as EventListener);
     return () =>
       window.removeEventListener(FLY_EVENT, handler as EventListener);
   }, [flyTo]);
+
+  // layers events
+  useEffect(() => {
+    const handler = (ev: Event) => {
+      const e = ev as CustomEvent<LayersDetail>;
+      if (!e.detail) return;
+
+      setLayers((prev) => ({
+        savedPins: e.detail.savedPins ?? prev.savedPins,
+        suggestedPins: e.detail.suggestedPins ?? prev.suggestedPins,
+        busStops: e.detail.busStops ?? prev.busStops,
+        busRoutes: e.detail.busRoutes ?? prev.busRoutes,
+        livePeople: e.detail.livePeople ?? prev.livePeople,
+
+        traffic: e.detail.traffic ?? prev.traffic,
+        transit: e.detail.transit ?? prev.transit,
+        biking: e.detail.biking ?? prev.biking,
+        base: e.detail.base ?? prev.base,
+      }));
+    };
+
+    window.addEventListener(LAYERS_EVENT, handler as EventListener);
+    return () =>
+      window.removeEventListener(LAYERS_EVENT, handler as EventListener);
+  }, []);
 
   const matchesService = (loc: Location, service: string) => {
     const text = (loc.name + " " + (loc.description || "")).toLowerCase();
@@ -138,7 +236,6 @@ export function MapView({
       shelter: ["shelter"],
       parks: ["park", "garden"],
       roads: ["road", "street", "rd", "st"],
-      // NOTE: bus is handled separately in your bus route effect
     };
     return (keywords[service] || []).some((k) => text.includes(k));
   };
@@ -179,20 +276,29 @@ export function MapView({
     isAddingLocationRef.current = isAddingLocation;
   }, [onMapClick, isAddingLocation]);
 
+  // init map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    const style = MAPTILER_API_KEY
+    const terrainStyle = MAPTILER_API_KEY
       ? `https://api.maptiler.com/maps/019c4c3d-7d0d-7f17-8117-945aa1848fdb/style.json?key=${MAPTILER_API_KEY}`
       : "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
-      style,
-      center: [0, 20],
-      zoom: 2,
+      style: terrainStyle,
+      center: CT_CENTER,
+      zoom: CT_ZOOM,
       pitch: 45,
       maxPitch: 85,
+
+      // ✅ South Africa only
+      maxBounds: SOUTH_AFRICA_BOUNDS,
+      renderWorldCopies: false,
+
+      // ✅ prevent zooming out to the world (minZoom roughly shows whole SA)
+      minZoom: 4.8,
+      maxZoom: 18,
     });
 
     map.current.addControl(
@@ -266,36 +372,16 @@ export function MapView({
           zoom,
         });
       });
-
-      if (map.current?.getSource("openmaptiles")) {
-        const layers = map.current.getStyle().layers;
-        const labelLayerId = layers?.find(
-          (l) => l.type === "symbol" && l.layout?.["text-field"],
-        )?.id;
-        if (!map.current.getLayer("3d-buildings")) {
-          map.current.addLayer(
-            {
-              id: "3d-buildings",
-              source: "openmaptiles",
-              "source-layer": "building",
-              type: "fill-extrusion",
-              minzoom: 14,
-              paint: {
-                "fill-extrusion-color": "hsl(222, 30%, 20%)",
-                "fill-extrusion-height": ["get", "render_height"],
-                "fill-extrusion-base": ["get", "render_min_height"],
-                "fill-extrusion-opacity": 0.7,
-              },
-            },
-            labelLayerId,
-          );
-        }
-      }
     });
 
     map.current.on("click", (e) => {
       if (onMapClickRef.current && isAddingLocationRef.current) {
-        onMapClickRef.current(e.lngLat.lng, e.lngLat.lat);
+        const c = clampToBounds(
+          e.lngLat.lng,
+          e.lngLat.lat,
+          SOUTH_AFRICA_BOUNDS,
+        );
+        onMapClickRef.current(c.lng, c.lat);
       }
     });
 
@@ -310,9 +396,90 @@ export function MapView({
     map.current.getCanvas().style.cursor = isAddingLocation ? "crosshair" : "";
   }, [isAddingLocation]);
 
-  // markers (DB saved locations) — ✅ now flyTo on click
+  /* ---------- Make “Traffic / Transit / Biking” buttons actually toggle stuff ---------- */
+
   useEffect(() => {
     if (!map.current || !isLoaded) return;
+
+    // Best effort matches for common style ids
+    // (These depend on the map style you’re using.)
+    setMatchingLayersVisibility(
+      map.current,
+      [/traffic/i, /congestion/i],
+      layers.traffic,
+    );
+    setMatchingLayersVisibility(
+      map.current,
+      [/bicycle/i, /bike/i, /cycling/i],
+      layers.biking,
+    );
+
+    // Transit “rail / train” best effort:
+    // 1) show/hide any existing rail layers
+    setMatchingLayersVisibility(
+      map.current,
+      [/rail/i, /railway/i, /subway/i, /tram/i, /transit/i],
+      layers.transit,
+    );
+
+    // 2) add our own rail overlay if OpenMapTiles transportation exists
+    const railLayerId = "findr-rail-overlay";
+    const hasOpenMapTiles = !!map.current.getSource("openmaptiles");
+
+    if (layers.transit && hasOpenMapTiles) {
+      if (!map.current.getLayer(railLayerId)) {
+        // Try to draw rail lines from OpenMapTiles transportation layer
+        try {
+          map.current.addLayer({
+            id: railLayerId,
+            type: "line",
+            source: "openmaptiles",
+            "source-layer": "transportation",
+            filter: [
+              "any",
+              ["==", ["get", "class"], "rail"],
+              ["==", ["get", "class"], "railway"],
+              ["==", ["get", "class"], "subway"],
+              ["==", ["get", "class"], "tram"],
+            ],
+            paint: {
+              "line-color": "#ffffff",
+              "line-width": 2.5,
+              "line-opacity": 0.85,
+            },
+          } as any);
+        } catch {
+          // If the style doesn't have that source-layer, nothing to do.
+        }
+      } else {
+        map.current.setLayoutProperty(railLayerId, "visibility", "visible");
+      }
+    } else {
+      if (map.current.getLayer(railLayerId)) {
+        map.current.setLayoutProperty(railLayerId, "visibility", "none");
+      }
+    }
+  }, [layers.traffic, layers.transit, layers.biking, isLoaded]);
+
+  /* ---------- saved pins (markers + clusters) ---------- */
+
+  useEffect(() => {
+    if (!map.current || !isLoaded) return;
+
+    if (map.current.getLayer("clusters")) {
+      map.current.setLayoutProperty(
+        "clusters",
+        "visibility",
+        layers.savedPins ? "visible" : "none",
+      );
+    }
+    if (map.current.getLayer("cluster-count")) {
+      map.current.setLayoutProperty(
+        "cluster-count",
+        "visibility",
+        layers.savedPins ? "visible" : "none",
+      );
+    }
 
     const source = map.current.getSource(
       "locations-src",
@@ -321,6 +488,8 @@ export function MapView({
 
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = [];
+
+    if (!layers.savedPins) return;
 
     filteredLocations.forEach((location) => {
       const pixel = map.current!.project([
@@ -345,8 +514,6 @@ export function MapView({
       el.onclick = (e) => {
         if (isAddingLocationRef.current) return;
         e.stopPropagation();
-
-        // ✅ Fly to the clicked DB pin + popup
         flyTo(
           location.longitude,
           location.latitude,
@@ -365,37 +532,36 @@ export function MapView({
 
       markersRef.current.push(marker);
     });
-  }, [filteredLocations, isLoaded, mapMoveTick, flyTo]);
+  }, [filteredLocations, isLoaded, mapMoveTick, flyTo, layers.savedPins]);
 
-  // ---- BUS ROUTE ---- (your code unchanged)
+  /* ---------- BUS ROUTE (uses your existing getBusRoute) ---------- */
+
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
-    const showBusRoute = selectedServices.includes("bus");
+    const showBusRoute =
+      selectedServices.includes("bus") && layers.busRoutes === true;
 
     if (!showBusRoute) {
       for (let i = 0; i < 10; i++) {
-        if (map.current.getLayer(`bus-route-line-${i}`)) {
+        if (map.current.getLayer(`bus-route-line-${i}`))
           map.current.setLayoutProperty(
             `bus-route-line-${i}`,
             "visibility",
             "none",
           );
-        }
-        if (map.current.getLayer(`bus-route-label-${i}`)) {
+        if (map.current.getLayer(`bus-route-label-${i}`))
           map.current.setLayoutProperty(
             `bus-route-label-${i}`,
             "visibility",
             "none",
           );
-        }
-        if (map.current.getLayer(`bus-route-stops-${i}`)) {
+        if (map.current.getLayer(`bus-route-stops-${i}`))
           map.current.setLayoutProperty(
             `bus-route-stops-${i}`,
             "visibility",
             "none",
           );
-        }
       }
       return;
     }
@@ -404,17 +570,11 @@ export function MapView({
 
     const ensureBusIcon = () =>
       new Promise<void>((resolve) => {
-        if (!map.current || map.current.hasImage(BUS_ICON_ID)) {
-          resolve();
-          return;
-        }
-
+        if (!map.current || map.current.hasImage(BUS_ICON_ID)) return resolve();
         const img = new Image(24, 24);
         img.onload = () => {
-          if (!map.current || map.current.hasImage(BUS_ICON_ID)) {
-            resolve();
-            return;
-          }
+          if (!map.current || map.current.hasImage(BUS_ICON_ID))
+            return resolve();
           map.current.addImage(BUS_ICON_ID, img, { sdf: true });
           resolve();
         };
@@ -453,19 +613,18 @@ export function MapView({
             })),
           };
 
-          if (!map.current.getSource(sourceId)) {
-            map.current.addSource(sourceId, {
+          if (!map.current!.getSource(sourceId))
+            map.current!.addSource(sourceId, {
               type: "geojson",
               data: routeGeojson,
             });
-          } else {
+          else
             (
-              map.current.getSource(sourceId) as maplibregl.GeoJSONSource
+              map.current!.getSource(sourceId) as maplibregl.GeoJSONSource
             ).setData(routeGeojson);
-          }
 
-          if (!map.current.getLayer(lineLayerId)) {
-            map.current.addLayer({
+          if (!map.current!.getLayer(lineLayerId)) {
+            map.current!.addLayer({
               id: lineLayerId,
               type: "line",
               source: sourceId,
@@ -476,16 +635,20 @@ export function MapView({
               },
             });
           } else {
-            map.current.setPaintProperty(
+            map.current!.setPaintProperty(
               lineLayerId,
               "line-color",
               routeData.color,
             );
-            map.current.setLayoutProperty(lineLayerId, "visibility", "visible");
+            map.current!.setLayoutProperty(
+              lineLayerId,
+              "visibility",
+              "visible",
+            );
           }
 
-          if (!map.current.getLayer(labelLayerId)) {
-            map.current.addLayer({
+          if (!map.current!.getLayer(labelLayerId)) {
+            map.current!.addLayer({
               id: labelLayerId,
               type: "symbol",
               source: sourceId,
@@ -504,31 +667,25 @@ export function MapView({
               },
             });
           } else {
-            map.current.setLayoutProperty(
+            map.current!.setLayoutProperty(
               labelLayerId,
               "visibility",
               "visible",
             );
           }
 
-          if (!map.current.getSource(stopsSourceId)) {
-            map.current.addSource(stopsSourceId, {
+          if (!map.current!.getSource(stopsSourceId))
+            map.current!.addSource(stopsSourceId, {
               type: "geojson",
               data: stopsGeojson,
             });
-          } else {
+          else
             (
-              map.current.getSource(stopsSourceId) as maplibregl.GeoJSONSource
+              map.current!.getSource(stopsSourceId) as maplibregl.GeoJSONSource
             ).setData(stopsGeojson);
-          }
 
           ensureBusIcon().then(() => {
             if (!map.current || isCancelled) return;
-
-            const stopsLayer = map.current.getLayer(stopsLayerId);
-            if (stopsLayer && stopsLayer.type !== "symbol") {
-              map.current.removeLayer(stopsLayerId);
-            }
 
             if (!map.current.getLayer(stopsLayerId)) {
               map.current.addLayer({
@@ -554,13 +711,13 @@ export function MapView({
                   "text-halo-width": 2,
                 },
               });
-            } else {
-              map.current.setLayoutProperty(
-                stopsLayerId,
-                "visibility",
-                "visible",
-              );
             }
+
+            map.current.setLayoutProperty(
+              stopsLayerId,
+              "visibility",
+              layers.busStops ? "visible" : "none",
+            );
           });
         });
       })
@@ -569,13 +726,21 @@ export function MapView({
     return () => {
       isCancelled = true;
     };
-  }, [isLoaded, selectedServices]);
+  }, [isLoaded, selectedServices, layers.busRoutes, layers.busStops]);
 
-  // Live Locations with Zoom awareness
+  /* ---------- Live people ---------- */
+
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
-    if (currentZoom < 4) {
+    if (!layers.livePeople) {
+      liveMarkersRef.current.forEach((marker) => marker.remove());
+      liveMarkersRef.current.clear();
+      return;
+    }
+
+    // keep your zoom rule
+    if (currentZoom < 6) {
       liveMarkersRef.current.forEach((marker) => marker.remove());
       liveMarkersRef.current.clear();
       return;
@@ -602,7 +767,7 @@ export function MapView({
         liveMarkersRef.current.set(loc.user_id, marker);
       }
     });
-  }, [liveLocations, isLoaded, currentZoom]);
+  }, [liveLocations, isLoaded, currentZoom, layers.livePeople]);
 
   const handleSelectLocation = useCallback(
     (loc: Location) => {
@@ -611,12 +776,10 @@ export function MapView({
         loc.latitude,
         loc.name,
         15,
-        `
-        <div class="p-4 min-w-[200px]">
+        `<div class="p-4 min-w-[200px]">
           <h3 class="font-semibold text-lg">${loc.name}</h3>
           ${loc.description ?? ""}
-        </div>
-      `,
+        </div>`,
       );
     },
     [flyTo],
@@ -629,7 +792,6 @@ export function MapView({
     [flyTo],
   );
 
-  // ✅ full screen map + centered MapControls (from your last request)
   return (
     <div className={cn("fixed inset-0 w-screen h-screen", className)}>
       <div ref={mapContainer} className="absolute inset-0" />
@@ -640,7 +802,11 @@ export function MapView({
             is3D={is3D}
             onToggle3D={() => setIs3D((v) => !v)}
             onResetView={() =>
-              map.current?.flyTo({ center: [0, 20], zoom: 2, pitch: 0 })
+              map.current?.fitBounds(SOUTH_AFRICA_BOUNDS, {
+                padding: 40,
+                duration: 900,
+                pitch: 0,
+              })
             }
             locations={locations}
             searchQuery={searchQuery}

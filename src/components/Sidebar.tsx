@@ -1,15 +1,14 @@
 import * as React from "react";
 import {
-  Search,
-  Bus,
-  PersonStanding,
-  Car,
-  ArrowUpDown,
   MapPin,
   Clock3,
   Star,
   Menu,
   X,
+  Layers,
+  Check,
+  Mountain,
+  Bus,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useLocations } from "@/hooks/useLocations";
@@ -17,8 +16,6 @@ import type { Location } from "@/hooks/useLocations";
 
 const BG = "#15292F";
 const ACCENT = "#009E61";
-
-type TransportMode = "drive" | "walk" | "transit";
 
 export type SuggestedPlace = {
   id: string;
@@ -28,33 +25,17 @@ export type SuggestedPlace = {
   distanceKm?: number;
   statusLine?: string;
   imageUrl?: string;
-
-  // required for flyTo + routing
   latitude: number;
   longitude: number;
 };
 
-type RouteItem = {
-  id: string;
-  title: string;
-  subtitle?: string;
-  timeMin: number;
-  distanceKm: number;
-  isFastest?: boolean;
-  severity?: "ok" | "warn" | "bad";
-};
-
 interface SidebarProps {
-  /** “places on the map” (geocode / nearby results etc). DB places will show first. */
   suggested?: SuggestedPlace[];
-  defaultMode?: TransportMode;
   maxSuggested?: number;
 }
 
 const FLY_EVENT = "findr:flyto";
-
-// Walking realism (OSRM walk can be optimistic) — adjust if needed
-const WALK_REALISM = 1.18; // 👈 change if walk still too fast (1.10–1.35)
+const LAYERS_EVENT = "findr:layers";
 
 /* ---------- helpers ---------- */
 
@@ -80,73 +61,16 @@ function toSuggestedPlace(loc: Location): SuggestedPlace {
   };
 }
 
-async function fetchOsrmRoute(
-  profile: "driving" | "walking",
-  from: { lng: number; lat: number },
-  to: { lng: number; lat: number },
-) {
-  const url =
-    `https://router.project-osrm.org/route/v1/${profile}` +
-    `/${from.lng},${from.lat};${to.lng},${to.lat}` +
-    `?overview=false&alternatives=true&steps=false`;
-
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`OSRM error ${res.status}`);
-  const data = await res.json();
-  if (!data?.routes?.length) throw new Error("No route found");
-  return data.routes as Array<{ duration: number; distance: number }>;
-}
-
-function toMin(sec: number) {
-  // ✅ ceil so we never underestimate
-  return Math.max(1, Math.ceil(sec / 60));
-}
-
-function toKm(m: number) {
-  return Math.max(0.1, Math.round((m / 1000) * 10) / 10);
-}
-
-function estimateTransitSeconds(drivingSeconds: number) {
-  // Better-than-nothing bus estimate without real timetables
-  const waitBuffer = 6 * 60;
-  const slowerFactor = 1.45;
-  return drivingSeconds * slowerFactor + waitBuffer;
-}
-
 function clampNum(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n));
 }
 
 /* ---------- component ---------- */
 
-export function Sidebar({
-  suggested,
-  defaultMode = "drive",
-  maxSuggested = 12,
-}: SidebarProps) {
-  const [mode, setMode] = React.useState<TransportMode>(defaultMode);
-  const [fromQuery, setFromQuery] = React.useState("");
-  const [toQuery, setToQuery] = React.useState("");
-  const [fromPlace, setFromPlace] = React.useState<SuggestedPlace | null>(null);
-  const [toPlace, setToPlace] = React.useState<SuggestedPlace | null>(null);
+export function Sidebar({ suggested, maxSuggested = 12 }: SidebarProps) {
+  // Suggested panel closed on load
+  const [open, setOpen] = React.useState(false);
 
-  // Collapsible: open on desktop by default
-  const [open, setOpen] = React.useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    return window.innerWidth >= 768;
-  });
-
-  // ✅ don't force-open on desktop resize (respects user collapsing)
-  React.useEffect(() => {
-    const onResize = () => {
-      // Only auto-close when going to mobile; don't auto-open on desktop
-      if (window.innerWidth < 768) setOpen(false);
-    };
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
-  // DB locations (saved)
   const { approvedLocations, userLocations } = useLocations();
 
   const dbPlaces = React.useMemo(() => {
@@ -157,12 +81,8 @@ export function Sidebar({
     return merged.map(toSuggestedPlace);
   }, [approvedLocations, userLocations]);
 
-  // ✅ DB FIRST, then map places
   const allPlaces: SuggestedPlace[] = React.useMemo(() => {
-    return uniqById([
-      ...(dbPlaces ?? []),
-      ...((suggested ?? []) as SuggestedPlace[]),
-    ]);
+    return uniqById([...(dbPlaces ?? []), ...((suggested ?? []) as any[])]);
   }, [dbPlaces, suggested]);
 
   const suggestedList = React.useMemo(() => {
@@ -178,117 +98,55 @@ export function Sidebar({
     if (window.innerWidth < 768) setOpen(false);
   }, []);
 
-  // Autocomplete
-  const fromMatches = React.useMemo(() => {
-    const q = fromQuery.trim().toLowerCase();
-    if (!q) return allPlaces.slice(0, 40);
-    return allPlaces
-      .filter((p) => p.name.toLowerCase().includes(q))
-      .slice(0, 60);
-  }, [fromQuery, allPlaces]);
+  /* ---------- Layers (ONLY terrain + transit) ---------- */
 
-  const toMatches = React.useMemo(() => {
-    const q = toQuery.trim().toLowerCase();
-    if (!q) return allPlaces.slice(0, 40);
-    return allPlaces
-      .filter((p) => p.name.toLowerCase().includes(q))
-      .slice(0, 60);
-  }, [toQuery, allPlaces]);
+  const [layersOpen, setLayersOpen] = React.useState(false);
 
-  // Routes state
-  const [fastest, setFastest] = React.useState<RouteItem | null>(null);
-  const [alternatives, setAlternatives] = React.useState<RouteItem[]>([]);
-  const [loadingRoutes, setLoadingRoutes] = React.useState(false);
-  const [routeError, setRouteError] = React.useState<string | null>(null);
+  // base: only terrain exists now (kept for future wiring if you want)
+  const [base] = React.useState<"terrain">("terrain");
 
-  // Compute routes on (from,to,mode)
+  // transit toggle (this is the only tile toggle now)
+  const [uiTiles, setUiTiles] = React.useState({
+    transit: false,
+  });
+
+  // overlays MapView uses
+  const [layerState, setLayerState] = React.useState({
+    savedPins: true,
+    suggestedPins: true,
+    busStops: true,
+    busRoutes: true,
+    livePeople: true,
+  });
+
+  const toggleLayer = (key: keyof typeof layerState) =>
+    setLayerState((s) => ({ ...s, [key]: !s[key] }));
+
+  // broadcast to MapView
   React.useEffect(() => {
-    const run = async () => {
-      if (!fromPlace || !toPlace) return;
+    window.dispatchEvent(
+      new CustomEvent(LAYERS_EVENT, {
+        detail: {
+          ...layerState,
+          base, // still sent (terrain)
+          transit: uiTiles.transit,
+        },
+      }),
+    );
+  }, [layerState, base, uiTiles.transit]);
 
-      setLoadingRoutes(true);
-      setRouteError(null);
-
-      try {
-        const from = { lng: fromPlace.longitude, lat: fromPlace.latitude };
-        const to = { lng: toPlace.longitude, lat: toPlace.latitude };
-
-        const [driveRoutes, walkRoutesRaw] = await Promise.all([
-          fetchOsrmRoute("driving", from, to),
-          fetchOsrmRoute("walking", from, to),
-        ]);
-
-        // ✅ realistic walking
-        const walkRoutes = walkRoutesRaw.map((r) => ({
-          ...r,
-          duration: r.duration * WALK_REALISM,
-        }));
-
-        let chosen: Array<{ duration: number; distance: number }> = [];
-        let title = "";
-        let subtitle0 = "Fastest option";
-        let subtitle1 = "Alternative";
-
-        if (mode === "walk") {
-          chosen = walkRoutes;
-          title = "Walking route";
-        } else if (mode === "transit") {
-          chosen = driveRoutes.map((r) => ({
-            duration: estimateTransitSeconds(r.duration),
-            distance: r.distance,
-          }));
-          title = "Bus / transit estimate";
-          subtitle0 = "Estimate (no timetable yet)";
-          subtitle1 = "Alternative estimate";
-        } else {
-          chosen = driveRoutes;
-          title = "Driving route";
-        }
-
-        const items: RouteItem[] = chosen.slice(0, 2).map((r, idx) => ({
-          id: `${mode}-${idx}`,
-          title,
-          subtitle: idx === 0 ? subtitle0 : subtitle1,
-          timeMin: toMin(r.duration),
-          distanceKm: toKm(r.distance),
-          isFastest: idx === 0,
-          severity: idx === 0 ? "ok" : "warn",
-        }));
-
-        setFastest(items[0] ?? null);
-        setAlternatives(items.slice(1));
-
-        flyToPlace(toPlace);
-      } catch (err: any) {
-        setFastest(null);
-        setAlternatives([]);
-        setRouteError(err?.message ?? "Failed to compute route");
-      } finally {
-        setLoadingRoutes(false);
-      }
-    };
-
-    run();
-  }, [fromPlace, toPlace, mode, flyToPlace]);
-
-  const swap = React.useCallback(() => {
-    const oldFrom = fromPlace;
-    const oldTo = toPlace;
-    const oldFromQ = fromQuery;
-    const oldToQ = toQuery;
-
-    setFromPlace(oldTo);
-    setToPlace(oldFrom);
-    setFromQuery(oldTo ? oldTo.name : oldToQ);
-    setToQuery(oldFrom ? oldFrom.name : oldFromQ);
-  }, [fromPlace, toPlace, fromQuery, toQuery]);
+  // close on ESC
+  React.useEffect(() => {
+    if (!layersOpen) return;
+    const onKey = (e: KeyboardEvent) =>
+      e.key === "Escape" && setLayersOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [layersOpen]);
 
   return (
     <>
-      {/* ✅ Toggle button:
-          - Mobile: always visible (open/close)
-          - Desktop: visible ONLY when sidebar is collapsed (so you can re-open)
-      */}
+      {/* Suggested toggle button */}
       <button
         className={cn(
           "fixed left-4 top-4 z-50",
@@ -310,7 +168,7 @@ export function Sidebar({
         )}
       </button>
 
-      {/* Backdrop on mobile */}
+      {/* Backdrop on mobile for suggested */}
       <div
         className={cn(
           "fixed inset-0 z-40 md:hidden transition-opacity",
@@ -322,14 +180,13 @@ export function Sidebar({
         onClick={() => setOpen(false)}
       />
 
-      {/* Sidebar column */}
+      {/* Suggested Places panel */}
       <aside
         className={cn(
           "fixed z-50 md:z-40",
           "left-4 top-4",
           "flex flex-col gap-4",
           "transition-transform duration-300 ease-out",
-          // ✅ collapses on desktop too
           open ? "translate-x-0" : "-translate-x-[110%]",
         )}
         style={{
@@ -337,7 +194,6 @@ export function Sidebar({
           maxHeight: "calc(100vh - 2rem)",
         }}
       >
-        {/* TOP: Suggested Places */}
         <GlassCard className="flex flex-col min-h-0">
           <div className="px-5 pt-5 pb-3">
             <div className="flex items-center justify-between gap-3">
@@ -361,7 +217,6 @@ export function Sidebar({
                 </div>
               </div>
 
-              {/* ✅ Collapse button on top of suggested card */}
               <button
                 className={cn(
                   "hidden md:grid",
@@ -378,7 +233,6 @@ export function Sidebar({
             </div>
           </div>
 
-          {/* Scrollable list */}
           <div className="px-4 pb-4 min-h-0">
             <div
               className="space-y-3 overflow-y-auto pr-1 scrollbar-hide"
@@ -465,129 +319,150 @@ export function Sidebar({
             </div>
           </div>
         </GlassCard>
+      </aside>
 
-        {/* BOTTOM: Directions */}
-        <GlassCard className="flex flex-col min-h-0">
-          <div className="px-4 pt-4">
-            <div className="flex items-center gap-2">
-              <ModeBtn
-                active={mode === "drive"}
-                onClick={() => setMode("drive")}
-              >
-                <Car className="h-5 w-5" />
-              </ModeBtn>
-              <ModeBtn active={mode === "walk"} onClick={() => setMode("walk")}>
-                <PersonStanding className="h-5 w-5" />
-              </ModeBtn>
-              <ModeBtn
-                active={mode === "transit"}
-                onClick={() => setMode("transit")}
-              >
-                <Bus className="h-5 w-5" />
-              </ModeBtn>
-            </div>
-          </div>
+      {/* ✅ Layers button LEFT + 20px higher */}
+      <div className="fixed z-50 left-4 bottom-[calc(1rem+20px)]">
+        <div className="relative">
+          <button
+            onClick={() => setLayersOpen((v) => !v)}
+            className={cn(
+              "h-12 w-12 rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.35)] backdrop-blur-xl",
+              "grid place-items-center transition hover:scale-[1.02] active:scale-[0.98]",
+            )}
+            style={{
+              background: `${BG}e6`,
+              borderColor: "rgba(255,255,255,0.10)",
+            }}
+            aria-label="Layers"
+            title="Layers"
+          >
+            <Layers className="h-5 w-5" style={{ color: ACCENT }} />
+          </button>
 
-          <div className="px-4 pt-3">
-            <div className="space-y-2">
-              <AutocompleteRow
-                icon={<Search className="h-4 w-4 text-white/55" />}
-                placeholder="Choose a starting point..."
-                value={fromQuery}
-                onChange={(v) => {
-                  setFromQuery(v);
-                  setFromPlace(null);
-                }}
-                options={fromMatches}
-                onPick={(p) => {
-                  setFromPlace(p);
-                  setFromQuery(p.name);
-                  flyToPlace(p);
-                }}
-              />
+          {/* click-away */}
+          {layersOpen && (
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setLayersOpen(false)}
+            />
+          )}
 
-              <div className="flex items-center gap-2">
-                <div className="flex-1">
-                  <AutocompleteRow
-                    icon={<MapPin className="h-4 w-4 text-red-400/90" />}
-                    placeholder="Choose a destination..."
-                    value={toQuery}
-                    onChange={(v) => {
-                      setToQuery(v);
-                      setToPlace(null);
-                    }}
-                    options={toMatches}
-                    onPick={(p) => {
-                      setToPlace(p);
-                      setToQuery(p.name);
-                      flyToPlace(p);
-                    }}
-                  />
+          {/* ✅ Popup NEXT to button + SAME COLOR + scrollable */}
+          {layersOpen && (
+            <div
+              className={cn(
+                "absolute left-[60px] bottom-0 z-50",
+                "w-[360px] max-w-[calc(100vw-88px)]",
+                "rounded-[22px] border overflow-hidden",
+                "shadow-[0_22px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl",
+              )}
+              style={{
+                background: `${BG}e6`,
+                borderColor: "rgba(255,255,255,0.10)",
+                maxHeight: "min(72vh, 520px)",
+              }}
+            >
+              <div className="px-4 pt-4 pb-3 flex items-center justify-between">
+                <div className="leading-tight">
+                  <div className="text-white font-semibold text-sm">
+                    Map type
+                  </div>
+                  <div className="text-white/55 text-xs -mt-0.5">
+                    Terrain + Transit + overlays
+                  </div>
                 </div>
 
                 <button
-                  className="h-[42px] w-[42px] rounded-2xl border grid place-items-center transition hover:bg-white/5"
+                  className={cn(
+                    "h-9 w-9 rounded-2xl border grid place-items-center",
+                    "transition hover:bg-white/5 active:scale-[0.98]",
+                  )}
                   style={{ borderColor: "rgba(255,255,255,0.10)" }}
-                  onClick={swap}
-                  title="Swap"
+                  onClick={() => setLayersOpen(false)}
+                  aria-label="Close layers"
+                  title="Close"
                 >
-                  <ArrowUpDown className="h-4 w-4 text-white/70" />
+                  <X className="h-4 w-4 text-white" />
                 </button>
               </div>
-            </div>
-          </div>
 
-          {/* ✅ BIG ROUTES / DESTINATION BLOCK */}
-          <div className="px-4 pt-4 pb-4 min-h-0">
-            <div
-              className="overflow-y-auto pr-1 scrollbar-hide"
-              style={{ maxHeight: "75vh" }}
-            >
-              {!fromPlace || !toPlace ? (
-                <div className="text-xs text-white/55">
-                  Pick a <span className="text-white">From</span> and{" "}
-                  <span className="text-white">To</span> location to see travel
-                  time.
+              {/* scroll body */}
+              <div
+                className="px-4 pb-4 overflow-y-auto scrollbar-hide"
+                style={{ maxHeight: "min(72vh, 520px)" }}
+              >
+                {/* Terrain (always selected) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <BigBaseTile
+                    label="Terrain"
+                    active
+                    onClick={() => {
+                      /* terrain is always on */
+                    }}
+                    icon={<Mountain className="h-5 w-5 text-white/90" />}
+                    subtitle="Default"
+                  />
+
+                  {/* Transit toggle */}
+                  <BigBaseTile
+                    label="Transit"
+                    active={uiTiles.transit}
+                    onClick={() =>
+                      setUiTiles((s) => ({ ...s, transit: !s.transit }))
+                    }
+                    icon={<Bus className="h-5 w-5 text-white/90" />}
+                    subtitle={uiTiles.transit ? "On" : "Off"}
+                  />
                 </div>
-              ) : loadingRoutes ? (
-                <div className="text-xs text-white/55">Calculating route…</div>
-              ) : routeError ? (
-                <div className="text-xs text-red-300">{routeError}</div>
-              ) : (
-                <>
-                  <div className="text-[11px] text-white/55 mb-2">
-                    Fastest Route
-                  </div>
-                  {fastest ? (
-                    <RouteCard item={fastest} accent={ACCENT} />
-                  ) : null}
 
-                  <div className="text-[11px] text-white/55 mt-4 mb-2">
-                    Alternative Routes
+                {/* Overlays */}
+                <div className="mt-4">
+                  <div className="text-white/70 text-xs font-medium mb-2">
+                    Overlays
                   </div>
                   <div className="space-y-2">
-                    {alternatives.map((r) => (
-                      <RouteCard key={r.id} item={r} accent={ACCENT} />
-                    ))}
-                    {alternatives.length === 0 && (
-                      <div className="text-xs text-white/55">
-                        No alternatives found.
-                      </div>
-                    )}
+                    <LayerToggle
+                      label="Saved pins"
+                      enabled={layerState.savedPins}
+                      onClick={() => toggleLayer("savedPins")}
+                    />
+                    <LayerToggle
+                      label="Suggested pins"
+                      enabled={layerState.suggestedPins}
+                      onClick={() => toggleLayer("suggestedPins")}
+                    />
+                    <LayerToggle
+                      label="Bus stops"
+                      enabled={layerState.busStops}
+                      onClick={() => toggleLayer("busStops")}
+                    />
+                    <LayerToggle
+                      label="Bus routes"
+                      enabled={layerState.busRoutes}
+                      onClick={() => toggleLayer("busRoutes")}
+                    />
+                    <LayerToggle
+                      label="Live people"
+                      enabled={layerState.livePeople}
+                      onClick={() => toggleLayer("livePeople")}
+                    />
                   </div>
 
-                  {mode === "transit" && (
-                    <div className="text-[11px] text-white/45 mt-3">
-                      Bus time is an estimate (no timetables). Real transit
-                      needs GTFS/OTP/Google Routes.
-                    </div>
-                  )}
-                </>
-              )}
+                  <button
+                    className="mt-3 w-full rounded-2xl border px-3 py-2 flex items-center justify-between hover:bg-white/5 transition"
+                    style={{ borderColor: "rgba(255,255,255,0.10)" }}
+                    onClick={() => setLayersOpen(false)}
+                  >
+                    <span className="text-white/80 text-sm">Done</span>
+                    <span className="text-white/45 text-xs">Close</span>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </GlassCard>
-      </aside>
+          )}
+        </div>
+      </div>
     </>
   );
 }
@@ -617,141 +492,90 @@ function GlassCard({
   );
 }
 
-function ModeBtn({
+function BigBaseTile({
+  label,
+  icon,
   active,
   onClick,
-  children,
+  subtitle,
 }: {
+  label: string;
+  icon: React.ReactNode;
   active: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  subtitle?: string;
 }) {
   return (
     <button
       onClick={onClick}
       className={cn(
-        "h-11 w-11 rounded-2xl border grid place-items-center transition",
-        "hover:bg-white/5",
+        "rounded-2xl border px-3 py-3 text-left transition hover:bg-white/5",
       )}
       style={{
-        borderColor: active ? `${ACCENT}55` : "rgba(255,255,255,0.10)",
-        background: active ? "rgba(255,255,255,0.06)" : "transparent",
-        color: active ? ACCENT : "rgba(255,255,255,0.80)",
+        borderColor: active ? `${ACCENT}66` : "rgba(255,255,255,0.10)",
+        boxShadow: active ? `0 0 0 1px ${ACCENT}55 inset` : undefined,
       }}
     >
-      {children}
+      <div className="flex items-center gap-2">
+        <div
+          className="h-10 w-10 rounded-2xl grid place-items-center border"
+          style={{
+            borderColor: "rgba(255,255,255,0.10)",
+            background: "rgba(0,0,0,0.20)",
+          }}
+        >
+          {icon}
+        </div>
+        <div>
+          <div className="text-white text-sm font-semibold">{label}</div>
+          <div className="text-white/55 text-xs -mt-0.5">
+            {subtitle ?? (active ? "Selected" : "Tap to select")}
+          </div>
+        </div>
+      </div>
     </button>
   );
 }
 
-function RouteCard({ item, accent }: { item: RouteItem; accent: string }) {
-  const color =
-    item.severity === "bad"
-      ? "rgba(255,80,80,0.95)"
-      : item.severity === "warn"
-        ? "rgba(255,200,0,0.95)"
-        : accent;
-
+function LayerToggle({
+  label,
+  enabled,
+  onClick,
+}: {
+  label: string;
+  enabled: boolean;
+  onClick: () => void;
+}) {
   return (
-    <div
-      className="rounded-2xl border p-3"
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-2xl border px-3 py-2",
+        "flex items-center justify-between",
+        "transition hover:bg-white/5 active:scale-[0.99]",
+      )}
       style={{
         borderColor: "rgba(255,255,255,0.10)",
-        background: "rgba(255,255,255,0.04)",
+        background: enabled ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.14)",
       }}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm text-white font-medium truncate">
-            {item.title}
-          </div>
-          {item.subtitle && (
-            <div className="text-xs text-white/55 mt-0.5">{item.subtitle}</div>
-          )}
-        </div>
-
-        <div className="text-right shrink-0">
-          <div className="text-sm font-semibold" style={{ color }}>
-            {item.timeMin} min
-          </div>
-          <div className="text-xs text-white/55">{item.distanceKm} km</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function AutocompleteRow({
-  icon,
-  placeholder,
-  value,
-  onChange,
-  options,
-  onPick,
-}: {
-  icon: React.ReactNode;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: SuggestedPlace[];
-  onPick: (p: SuggestedPlace) => void;
-}) {
-  const [open, setOpen] = React.useState(false);
-
-  return (
-    <div className="relative">
+      <div className="text-sm text-white/90">{label}</div>
       <div
-        className="h-[42px] rounded-2xl border px-3 flex items-center gap-2"
+        className={cn(
+          "h-8 w-8 rounded-xl grid place-items-center border",
+          enabled ? "" : "opacity-70",
+        )}
         style={{
-          borderColor: "rgba(255,255,255,0.10)",
-          background: "rgba(0,0,0,0.18)",
+          borderColor: enabled ? `${ACCENT}55` : "rgba(255,255,255,0.12)",
+          color: enabled ? ACCENT : "rgba(255,255,255,0.55)",
         }}
       >
-        <div className="shrink-0">{icon}</div>
-        <input
-          className="w-full bg-transparent outline-none text-sm text-white placeholder:text-white/35"
-          placeholder={placeholder}
-          value={value}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setTimeout(() => setOpen(false), 140)}
-          onChange={(e) => {
-            onChange(e.target.value);
-            setOpen(true);
-          }}
-        />
+        {enabled ? (
+          <Check className="h-4 w-4" />
+        ) : (
+          <span className="text-xs">—</span>
+        )}
       </div>
-
-      {/* Dropdown */}
-      {open && options.length > 0 && (
-        <div
-          className="absolute left-0 right-0 mt-2 rounded-2xl border overflow-hidden z-50"
-          style={{
-            borderColor: "rgba(255,255,255,0.10)",
-            background: `${BG}f2`,
-          }}
-        >
-          <div className="max-h-[420px] overflow-y-auto">
-            {options.map((p) => (
-              <button
-                key={p.id}
-                className="w-full text-left px-3 py-2 text-sm text-white/90 hover:bg-white/5"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onPick(p);
-                  setOpen(false);
-                }}
-              >
-                <div className="font-medium truncate">{p.name}</div>
-                {p.category && (
-                  <div className="text-xs text-white/55 truncate">
-                    {p.category}
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
+    </button>
   );
 }
