@@ -7,6 +7,8 @@ import { LiveLocation } from "@/hooks/useLiveLocations";
 import { MapControls } from "./MapControls";
 import { cn } from "@/lib/utils";
 import { getBusRoute, type BusRouteData } from "@/lib/busRoute";
+import { readCache, writeCache } from "@/lib/localCache";
+import { warmupGlobalMapCache } from "@/lib/mapCacheWarmup";
 
 interface MapViewProps {
   locations: Location[];
@@ -27,12 +29,27 @@ const BUS_ICON_SVG =
 
 // ✅ FlyTo event name (used by sidebar)
 const FLY_EVENT = "findr:flyto";
+const MAP_VIEW_CACHE_KEY = "map:view";
+const MAP_FILTERS_CACHE_KEY = "map:filters";
+const MAP_SEARCH_CACHE_KEY = "map:search";
+const MAP_3D_CACHE_KEY = "map:is3d";
 type FlyDetail = {
   lng: number;
   lat: number;
   label?: string;
   zoom?: number;
   html?: string;
+};
+
+type CachedMapView = {
+  center: [number, number];
+  zoom: number;
+  pitch: number;
+  bearing: number;
+};
+
+type CachedMapFilters = {
+  selectedServices: string[];
 };
 
 function locationsToGeoJSON(
@@ -66,11 +83,15 @@ export function MapView({
   const isAddingLocationRef = useRef(isAddingLocation);
 
   const [isLoaded, setIsLoaded] = useState(false);
-  const [is3D, setIs3D] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [is3D, setIs3D] = useState(() => readCache<boolean>(MAP_3D_CACHE_KEY) ?? true);
+  const [searchQuery, setSearchQuery] = useState(() => readCache<string>(MAP_SEARCH_CACHE_KEY) ?? "");
+  const [selectedServices, setSelectedServices] = useState<string[]>(
+    () => readCache<CachedMapFilters>(MAP_FILTERS_CACHE_KEY)?.selectedServices ?? [],
+  );
   const [mapMoveTick, setMapMoveTick] = useState(0);
   const [currentZoom, setCurrentZoom] = useState(2);
+  const cachedMapViewRef = useRef<CachedMapView | null>(readCache<CachedMapView>(MAP_VIEW_CACHE_KEY));
+  const hasStartedWarmupRef = useRef(false);
 
   // ✅ Single FlyTo helper used by BOTH map clicks + sidebar clicks
   const flyTo = useCallback(
@@ -180,18 +201,33 @@ export function MapView({
   }, [onMapClick, isAddingLocation]);
 
   useEffect(() => {
+    writeCache<boolean>(MAP_3D_CACHE_KEY, is3D);
+  }, [is3D]);
+
+  useEffect(() => {
+    writeCache<string>(MAP_SEARCH_CACHE_KEY, searchQuery);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    writeCache<CachedMapFilters>(MAP_FILTERS_CACHE_KEY, { selectedServices });
+  }, [selectedServices]);
+
+  useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
     const style = MAPTILER_API_KEY
       ? `https://api.maptiler.com/maps/019c4c3d-7d0d-7f17-8117-945aa1848fdb/style.json?key=${MAPTILER_API_KEY}`
       : "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
 
+    const cachedMapView = cachedMapViewRef.current;
+
     map.current = new maplibregl.Map({
       container: mapContainer.current,
       style,
-      center: [0, 20],
-      zoom: 2,
-      pitch: 45,
+      center: cachedMapView?.center ?? [0, 20],
+      zoom: cachedMapView?.zoom ?? 2,
+      pitch: cachedMapView?.pitch ?? 45,
+      bearing: cachedMapView?.bearing ?? 0,
       maxPitch: 85,
     });
 
@@ -213,7 +249,15 @@ export function MapView({
 
     map.current.on("moveend", () => {
       setMapMoveTick((t) => t + 1);
-      if (map.current) setCurrentZoom(map.current.getZoom());
+      if (!map.current) return;
+
+      setCurrentZoom(map.current.getZoom());
+      writeCache<CachedMapView>(MAP_VIEW_CACHE_KEY, {
+        center: [map.current.getCenter().lng, map.current.getCenter().lat],
+        zoom: map.current.getZoom(),
+        pitch: map.current.getPitch(),
+        bearing: map.current.getBearing(),
+      });
     });
 
     map.current.on("load", () => {
@@ -221,7 +265,7 @@ export function MapView({
 
       map.current!.addSource("locations-src", {
         type: "geojson",
-        data: locationsToGeoJSON(filteredLocations),
+        data: locationsToGeoJSON([]),
         cluster: true,
         clusterMaxZoom: 14,
         clusterRadius: 50,
@@ -304,6 +348,34 @@ export function MapView({
       map.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!map.current) return;
+
+    map.current.easeTo({
+      pitch: is3D ? 45 : 0,
+      duration: 500,
+    });
+  }, [is3D]);
+
+  useEffect(() => {
+    if (!isLoaded || hasStartedWarmupRef.current || !MAPTILER_API_KEY) return;
+    hasStartedWarmupRef.current = true;
+
+    const warmupZoom = Number(import.meta.env.VITE_MAP_OFFLINE_MAX_ZOOM ?? 8);
+    const warmupBatchSize = Number(import.meta.env.VITE_MAP_OFFLINE_BATCH_SIZE ?? 20);
+    const warmupEstimatedReqPerSec = Number(import.meta.env.VITE_MAP_OFFLINE_EST_REQ_PER_SEC ?? 50);
+    const styleUrl = `https://api.maptiler.com/maps/019c4c3d-7d0d-7f17-8117-945aa1848fdb/style.json?key=${MAPTILER_API_KEY}`;
+
+    warmupGlobalMapCache(
+      styleUrl,
+      Number.isFinite(warmupZoom) ? warmupZoom : 8,
+      Number.isFinite(warmupBatchSize) ? warmupBatchSize : 20,
+      Number.isFinite(warmupEstimatedReqPerSec) ? warmupEstimatedReqPerSec : 50,
+    ).catch((error) => {
+      console.error("Map cache warmup failed", error);
+    });
+  }, [isLoaded]);
 
   useEffect(() => {
     if (!map.current) return;
@@ -639,9 +711,16 @@ export function MapView({
           <MapControls
             is3D={is3D}
             onToggle3D={() => setIs3D((v) => !v)}
-            onResetView={() =>
-              map.current?.flyTo({ center: [0, 20], zoom: 2, pitch: 0 })
-            }
+            onResetView={() => {
+              if (!map.current) return;
+              map.current.flyTo({ center: [0, 20], zoom: 2, pitch: 0, bearing: 0 });
+              writeCache<CachedMapView>(MAP_VIEW_CACHE_KEY, {
+                center: [0, 20],
+                zoom: 2,
+                pitch: 0,
+                bearing: 0,
+              });
+            }}
             locations={locations}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}

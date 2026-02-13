@@ -1,6 +1,7 @@
 // Utility to parse bus route and stops from GeoJSON
 
 import busRoutesUrl from '@/data/bus_routes.geojson?url';
+import { readCache, writeCache } from '@/lib/localCache';
 
 export interface BusStop {
   name: string;
@@ -16,12 +17,30 @@ export interface BusRouteData {
   color: string;
 }
 
+interface BusRouteFeature {
+  id?: string;
+  properties?: {
+    name?: string;
+    description?: string;
+  };
+  geometry: {
+    coordinates: [number, number][];
+  };
+}
+
+interface BusRoutesGeoJson {
+  features: BusRouteFeature[];
+}
+
 const routeColors = [
   '#c56b25', // Orange
   '#c56b25', // Orange
   '#c56b25', // Orange
   '#c56b25', // Orange
 ];
+
+const BUS_ROUTE_CACHE_KEY = 'bus-routes';
+const BUS_ROUTE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 
 // Function to find the closest waypoint index to a target coordinate
 function findClosestWaypointIndex(
@@ -124,25 +143,33 @@ function identifyBusStops(
 }
 
 export function getBusRoute() {
-  // Fetch the GeoJSON at runtime
+  const mapRoutes = (busRoutes: BusRoutesGeoJson): BusRouteData[] =>
+    busRoutes.features.map((feature, index) => {
+      const coordinates = feature.geometry.coordinates;
+      const routeName = feature.properties?.name || `Route ${index + 1}`;
+
+      return {
+        id: feature.id || `route-${index}`,
+        name: routeName,
+        description: feature.properties?.description || '',
+        route: coordinates,
+        stops: identifyBusStops(routeName, coordinates),
+        color: routeColors[index % routeColors.length],
+      };
+    });
+
   return fetch(busRoutesUrl)
     .then((res) => res.json())
     .then((busRoutes) => {
-      // Load ALL routes with their metadata
-      const routes: BusRouteData[] = busRoutes.features.map((feature: any, index: number) => {
-        const coordinates = feature.geometry.coordinates;
-        const routeName = feature.properties?.name || `Route ${index + 1}`;
-        
-        return {
-          id: feature.id || `route-${index}`,
-          name: routeName,
-          description: feature.properties?.description || '',
-          route: coordinates,
-          stops: identifyBusStops(routeName, coordinates),
-          color: routeColors[index % routeColors.length],
-        };
-      });
-
+      const routes = mapRoutes(busRoutes);
+      writeCache(BUS_ROUTE_CACHE_KEY, routes, BUS_ROUTE_TTL_MS);
       return routes;
+    })
+    .catch((error) => {
+      const cached = readCache<BusRouteData[]>(BUS_ROUTE_CACHE_KEY);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        return cached;
+      }
+      throw error;
     });
 }

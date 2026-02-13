@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
+import { readCache, writeCache } from '@/lib/localCache';
+
+const LOCATIONS_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
 
 export interface Location {
   id: string;
@@ -19,6 +22,15 @@ export function useLocations() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { user, isAdmin } = useAuth();
+  const cacheKey = `locations:${isAdmin ? 'admin' : user ? user.id : 'public'}`;
+
+  useEffect(() => {
+    const cached = readCache<Location[]>(cacheKey);
+    if (cached && Array.isArray(cached)) {
+      setLocations(cached);
+      setIsLoading(false);
+    }
+  }, [cacheKey]);
 
   const fetchLocations = useCallback(async () => {
     setIsLoading(true);
@@ -47,14 +59,21 @@ export function useLocations() {
 
     if (error) {
       console.error('Error fetching locations:', error);
-      toast.error('Failed to load locations');
-      setLocations([]);
+      const cached = readCache<Location[]>(cacheKey);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        setLocations(cached);
+        toast.warning('Offline mode: showing cached locations');
+      } else {
+        toast.error('Failed to load locations');
+      }
     } else {
-      setLocations(data as Location[] || []);
+      const nextLocations = (data as Location[]) || [];
+      setLocations(nextLocations);
+      writeCache(cacheKey, nextLocations, LOCATIONS_CACHE_TTL_MS);
     }
     
     setIsLoading(false);
-  }, [user, isAdmin]);
+  }, [user, isAdmin, cacheKey]);
 
   useEffect(() => {
     fetchLocations();

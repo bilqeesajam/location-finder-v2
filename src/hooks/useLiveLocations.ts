@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { useAuth } from './useAuth';
 import { toast } from 'sonner';
+import { readCache, writeCache } from '@/lib/localCache';
+
+const LIVE_LOCATIONS_CACHE_KEY = 'live-locations';
+const LIVE_LOCATIONS_CACHE_TTL_MS = 1000 * 60 * 10;
 
 export interface LiveLocation {
   id: string;
@@ -18,6 +22,13 @@ export function useLiveLocations() {
   const watchIdRef = useRef<number | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
+  useEffect(() => {
+    const cached = readCache<LiveLocation[]>(LIVE_LOCATIONS_CACHE_KEY);
+    if (cached && Array.isArray(cached)) {
+      setLiveLocations(cached);
+    }
+  }, []);
+
   // Fetch live locations directly from database
   const fetchLiveLocations = useCallback(async () => {
     const { data, error } = await supabase
@@ -26,8 +37,14 @@ export function useLiveLocations() {
 
     if (error) {
       console.error('Error fetching live locations:', error);
+      const cached = readCache<LiveLocation[]>(LIVE_LOCATIONS_CACHE_KEY);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        setLiveLocations(cached);
+      }
     } else {
-      setLiveLocations(data as LiveLocation[] || []);
+      const next = (data as LiveLocation[]) || [];
+      setLiveLocations(next);
+      writeCache(LIVE_LOCATIONS_CACHE_KEY, next, LIVE_LOCATIONS_CACHE_TTL_MS);
     }
   }, []);
 
@@ -60,6 +77,23 @@ export function useLiveLocations() {
   // Update user's live location
   const updateMyLocation = useCallback(async (latitude: number, longitude: number) => {
     if (!user) return;
+
+    const optimisticLocation: LiveLocation = {
+      id: `${user.id}-local`,
+      user_id: user.id,
+      latitude,
+      longitude,
+      updated_at: new Date().toISOString(),
+    };
+
+    setLiveLocations((prev) => {
+      const next = [
+        ...prev.filter((location) => location.user_id !== user.id),
+        optimisticLocation,
+      ];
+      writeCache(LIVE_LOCATIONS_CACHE_KEY, next, LIVE_LOCATIONS_CACHE_TTL_MS);
+      return next;
+    });
 
     const { error } = await supabase
       .from('live_locations')
@@ -125,6 +159,12 @@ export function useLiveLocations() {
     }
 
     if (user) {
+      setLiveLocations((prev) => {
+        const next = prev.filter((location) => location.user_id !== user.id);
+        writeCache(LIVE_LOCATIONS_CACHE_KEY, next, LIVE_LOCATIONS_CACHE_TTL_MS);
+        return next;
+      });
+
       const { error } = await supabase
         .from('live_locations')
         .delete()
