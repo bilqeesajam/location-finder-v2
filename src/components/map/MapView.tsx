@@ -603,17 +603,24 @@ export function MapView({
   useEffect(() => {
     if (!map.current || !isLoaded) return;
 
-    const showTrainRoute = currentMode === "train" && trainRouteVisible;
+   const showTrainRoute = currentMode === "train" && trainRouteVisible;
 
-    if (!showTrainRoute) {
-      if (map.current.getLayer("train-route-line")) {
-        map.current.setLayoutProperty("train-route-line", "visibility", "none");
-      }
-      if (map.current.getLayer("train-route-label")) {
-        map.current.setLayoutProperty("train-route-label", "visibility", "none");
-      }
-      return;
-    }
+if (!showTrainRoute) {
+  if (map.current.getLayer("train-route-line")) {
+    map.current.setLayoutProperty("train-route-line", "visibility", "none");
+  }
+  if (map.current.getLayer("train-route-label")) {
+    map.current.setLayoutProperty("train-route-label", "visibility", "none");
+  }
+
+  // ✅ CLOSE ANY OPEN TRAIN POPUP
+  if (popupRef.current) {
+    popupRef.current.remove();
+    popupRef.current = null;
+  }
+
+  return;
+}
 
     try {
       const trainRoute = getTrainRouteFromMap();
